@@ -1,1 +1,0 @@
-import{_ as s,c as o,b as t,o as r}from"./index-DF0nlzRU.js";const a={},c={class:"rounded-xl bg-white p-8 shadow"};function n(d,e){return r(),o("div",c,[...e[0]||(e[0]=[t("h1",{class:"text-2xl font-bold"},"ประวัติการขาย",-1)])])}const _=s(a,[["render",n]]);export{_ as default};

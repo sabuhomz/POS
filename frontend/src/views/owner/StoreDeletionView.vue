@@ -92,11 +92,14 @@ const submitDeletionRequest = async () => {
   isSubmitting.value = true;
 
   try {
+    const confirmed = window.confirm('ต้องการยื่นคำขอปิดร้านค้าใช่หรือไม่?');
+    if (!confirmed) return;
+
     // ⚠️ แก้ไข URL ให้ตรงกับ router.post('/stores/delete-requests')
     await axios.post(`${API_URL}/stores/delete-requests`, {
       reason: reason.value
     }, getHeaders());
-    
+
     alert('ยื่นคำขอปิดร้านสำเร็จ กรุณารอ Admin อนุมัติ');
     reason.value = '';
     await fetchCurrentRequest(); // โหลดข้อมูลมาใหม่
