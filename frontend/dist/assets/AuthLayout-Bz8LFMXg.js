@@ -1,0 +1,1 @@
+import{_ as t,c as o,a as c,r as n,o as r}from"./index-DF0nlzRU.js";const s={},a={class:"min-h-screen bg-gray-100 flex items-center justify-center p-6"};function _(i,f){const e=n("RouterView");return r(),o("div",a,[c(e)])}const u=t(s,[["render",_]]);export{u as default};

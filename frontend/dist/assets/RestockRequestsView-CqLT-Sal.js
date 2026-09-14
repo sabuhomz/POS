@@ -1,1 +1,0 @@
-import{_ as t,c as o,b as s,o as c}from"./index-DDIVbyP8.js";const a={},r={class:"rounded-xl bg-white p-8 shadow"};function n(d,e){return c(),o("div",r,[...e[0]||(e[0]=[s("h1",{class:"text-2xl font-bold"},"RestockRequestsView",-1),s("p",{class:"mt-2 text-gray-500"},"หน้าสำหรับต่อ API ภายหลัง",-1)])])}const _=t(a,[["render",n]]);export{_ as default};
