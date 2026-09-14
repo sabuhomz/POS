@@ -1,0 +1,27 @@
+# POS Frontend
+
+Vue 3 frontend สำหรับระบบจริง
+
+- Login ด้วย username/password จาก Backend จริง
+- Admin สร้าง ADMIN และ OWNER
+- OWNER ผูกกับ Store
+- Permission checkbox บันทึกผ่าน API ลง PostgreSQL
+- ไม่มี Mock/Demo account
+ตั้งค่า `.env`:
+
+```env
+VITE_API_BASE_URL=http://localhost:5000/api
+```
+
+ถ้า Backend เปิดผ่าน ngrok ให้เปลี่ยนเป็น:
+
+```env
+VITE_API_BASE_URL=https://YOUR-NGROK-DOMAIN.ngrok-free.app/api
+```
+# Frontend changes
+- Admin ระงับ/เปิดใช้งานร้านผ่าน `PATCH /api/admin/stores/:id/status`
+- Owner ส่งคำขอลบร้านผ่าน `POST /api/stores/delete-requests`
+- Admin ดูคำขอลบผ่าน `GET /api/admin/store-delete-requests`
+- Admin อนุมัติ/ปฏิเสธผ่าน `PATCH /api/admin/store-delete-requests/:id`
+- Owner ดูสถานะคำขอผ่าน `GET /api/stores/delete-requests/me`
+- แก้ Logout ของ Admin และ Owner ให้ล้าง auth แล้ว `router.replace('/login')`
