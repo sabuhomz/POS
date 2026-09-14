@@ -1,12 +1,153 @@
 @import "tailwindcss";
+
+:root {
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+html,
+body,
+#app {
+  min-height: 100%;
+  width: 100%;
+  max-width: 100%;
+}
+
+html {
+  overflow-x: hidden;
+}
+
 body {
   margin: 0;
+  min-width: 320px;
   font-family: ui-sans-serif, system-ui, sans-serif;
   background: #f3f4f6;
   color: #111827;
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
 }
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
+}
+
+button,
+input,
+select,
+textarea {
+  max-width: 100%;
+}
+
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+}
+
+img {
+  height: auto;
+}
+
+/* Prevent common flex/grid children from forcing horizontal overflow. */
+.flex > *,
+.grid > * {
+  min-width: 0;
+}
+
+/* Tables remain usable on small screens instead of pushing the whole page wider. */
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+/* Long content such as SKU, receipt numbers and URLs can wrap on narrow screens. */
+th,
+td,
+.breakable {
+  overflow-wrap: anywhere;
+}
+
+/* Forms and cards should never exceed their parent width. */
+form,
+fieldset,
+[class*="rounded"],
+[class*="shadow"] {
+  min-width: 0;
+}
+
+@media (max-width: 1023px) {
+  .overflow-x-auto {
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Two-column layouts become easier to read on tablets. */
+  [class*="grid-cols-3"],
+  [class*="grid-cols-4"],
+  [class*="grid-cols-5"],
+  [class*="grid-cols-6"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 767px) {
+  /* Stack multi-column pages on phones. */
+  [class*="grid-cols-2"],
+  [class*="grid-cols-3"],
+  [class*="grid-cols-4"],
+  [class*="grid-cols-5"],
+  [class*="grid-cols-6"] {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  /* Utility for page sections that are commonly too wide on mobile. */
+  .responsive-stack {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  .responsive-full {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  h1 {
+    font-size: clamp(1.35rem, 5vw, 1.875rem);
+  }
+
+  h2 {
+    font-size: clamp(1.15rem, 4vw, 1.5rem);
+  }
+
+  input,
+  select,
+  textarea {
+    min-height: 2.5rem;
+  }
+
+  table {
+    font-size: .875rem;
+  }
+}
+
+@media (max-width: 479px) {
+  body {
+    min-width: 0;
+  }
+
+  .overflow-x-auto {
+    margin-right: -0.25rem;
+    padding-right: 0.25rem;
+  }
 }
