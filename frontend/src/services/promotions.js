@@ -2,7 +2,11 @@ import api from './api'
 
 export async function getPromotions() {
   const response = await api.get('/promotions')
-  return response.data
+
+  // Keep the axios-like response shape expected by PromotionsView.
+  return {
+    data: response.data
+  }
 }
 
 export async function getPromotion(id) {
