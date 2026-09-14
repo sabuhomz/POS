@@ -19,8 +19,11 @@ const app = express()
 
 app.locals.dbPool = pool
 
+// Allow local development and the current Vercel production frontend by default.
+// For custom domains or additional frontends, set CORS_ORIGIN in the backend environment.
 const origins = (
-  process.env.CORS_ORIGIN || 'http://localhost:5173'
+  process.env.CORS_ORIGIN ||
+  'http://localhost:5173,https://pos-fawn-five.vercel.app'
 )
   .split(',')
   .map(x => x.trim())
