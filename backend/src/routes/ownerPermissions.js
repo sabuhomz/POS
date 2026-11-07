@@ -11,6 +11,7 @@ router.use(authenticate, requireRole('OWNER'))
 const selectableKeys = [
   'sale.create',
   'inventory.restock.request',
+  'inventory.restock.direct',
   'sale.view'
 ]
 // The desktop app must load /api/products on login even for staff who only
@@ -20,11 +21,8 @@ const managedKeys = ['product.view', ...selectableKeys]
 
 router.get('/permissions/catalog', async (_req, res, next) => {
   try {
-    const result = await pool.query(
-      'SELECT permission_key FROM permissions WHERE permission_key = ANY($1::varchar[]) ORDER BY permission_key',
-      [selectableKeys]
-    )
-    res.json({ permissions: result.rows.map(row => row.permission_key) })
+    // The new key may not exist in older databases until it is first granted.
+    res.json({ permissions: selectableKeys })
   } catch (error) { next(error) }
 })
 
@@ -64,6 +62,12 @@ router.put('/permissions/employees/:id', async (req, res, next) => {
     if (!target.rowCount) {
       await client.query('ROLLBACK')
       return res.status(404).json({ message: 'ไม่พบพนักงานในร้านของคุณ' })
+    }
+    // Bootstrap only the new POS-specific permission in existing databases.
+    if (permissions.includes('inventory.restock.direct')) {
+      await client.query(`INSERT INTO permissions (permission_key, description)
+        VALUES ('inventory.restock.direct', 'Direct barcode restock in Python POS')
+        ON CONFLICT (permission_key) DO NOTHING`)
     }
     const catalog = await client.query(
       'SELECT permission_key FROM permissions WHERE permission_key = ANY($1::varchar[])',
