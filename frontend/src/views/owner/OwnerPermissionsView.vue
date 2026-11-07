@@ -11,7 +11,9 @@ const groups = [
     ['inventory.restock.direct', 'สแกนเพิ่มสินค้าเข้าสต็อกทันที (ไม่ต้องส่งคำขอ)']
   ] },
   { title: 'ประวัติการขาย', entries: [
-    ['sale.view', 'ดูประวัติการขายและรายละเอียดใบเสร็จ']
+    ['sale.view', 'ดูประวัติการขายและรายละเอียดใบเสร็จ'],
+    ['sale.correction.request', 'ส่งคำขอยกเลิกหรือแก้ไขยอดใบเสร็จ (ต้องอนุมัติ)'],
+    ['sale.correction.direct', 'ยกเลิกหรือแก้ไขยอดใบเสร็จได้ทันที (ไม่ต้องขออนุมัติ)']
   ] }
 ]
 const employees = ref([])
@@ -81,7 +83,7 @@ onMounted(load)
     <div class="heading">
       <div>
         <h1>กำหนดสิทธิ์พนักงาน</h1>
-        <p>กำหนดการใช้งานเฉพาะ 3 หน้าของแอป POS สำหรับพนักงาน</p>
+        <p>กำหนดสิทธิ์การใช้งานแอป POS และการจัดการใบเสร็จเป็นรายพนักงาน</p>
       </div>
       <button class="secondary" type="button" :disabled="loading || saving" @click="load">↻ รีเฟรช</button>
     </div>
