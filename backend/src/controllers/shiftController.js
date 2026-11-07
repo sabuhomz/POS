@@ -80,6 +80,7 @@ export async function listStoreShifts(req, res, next) {
          SELECT COUNT(*)::int AS order_count, COALESCE(SUM(s.total),0) AS total_sales
          FROM sales s
          WHERE s.store_id=sh.store_id
+           AND s.correction_status='ACTIVE'
            AND s.employee_id=sh.employee_id
            AND s.created_at >= sh.started_at
            AND (sh.ended_at IS NULL OR s.created_at <= sh.ended_at)
