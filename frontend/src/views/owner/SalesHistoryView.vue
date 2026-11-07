@@ -117,7 +117,7 @@
           <tbody>
             <tr v-for="sale in sales" :key="sale.id" class="border-b last:border-0">
               <td class="whitespace-nowrap px-4 py-3">{{ formatDate(sale.createdAt) }}</td>
-              <td class="px-4 py-3 font-medium">{{ sale.receiptNumber }}</td>
+              <td class="px-4 py-3 font-medium">{{ sale.receiptNumber }}<span v-if="sale.correctionStatus === 'VOID'" class="ml-2 rounded bg-red-100 px-2 py-1 text-xs text-red-700">ยกเลิกแล้ว</span></td>
               <td class="px-4 py-3">{{ sale.employeeUsername || '-' }}</td>
               <td class="max-w-md px-4 py-3">
                 <div v-for="item in sale.items" :key="item.id" class="truncate">{{ item.productName }} × {{ item.quantity }}</div>
@@ -147,7 +147,7 @@
         <div class="flex items-center justify-between">
           <div>
             <h2 class="text-xl font-bold">รายละเอียดการขาย</h2>
-            <p class="text-sm text-gray-500">{{ selectedSale.receiptNumber }}</p> <p class="text-sm text-gray-500">{{ formatDate(selectedSale.createdAt) }}</p> <p class="text-sm text-gray-500">ผู้ขาย: {{ selectedSale.employeeUsername }}</p>
+            <p class="text-sm text-gray-500">{{ selectedSale.receiptNumber }}</p> <span v-if="selectedSale.correctionStatus === 'VOID'" class="rounded bg-red-100 px-2 py-1 text-xs font-semibold text-red-700">ใบเสร็จยกเลิกแล้ว · ไม่รวมในยอดขาย</span> <p class="text-sm text-gray-500">{{ formatDate(selectedSale.createdAt) }}</p> <p class="text-sm text-gray-500">ผู้ขาย: {{ selectedSale.employeeUsername }}</p>
           </div>
           <button type="button" class="text-2xl text-gray-500" @click="selectedSale = null">×</button>
         </div>
