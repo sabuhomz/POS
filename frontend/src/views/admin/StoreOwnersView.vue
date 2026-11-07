@@ -33,6 +33,7 @@ onMounted(load)
     <div v-if="error" class="rounded-lg bg-red-50 p-3 text-red-700">{{ error }}</div>
     <section class="rounded-xl bg-white p-6 shadow-sm">
       <h2 class="mb-4 text-lg font-semibold">สร้างผู้ใช้งาน</h2>
+      <p v-if="form.role === 'OWNER'" class="mb-4 text-sm text-gray-600">บัญชี OWNER จะได้รับสิทธิ์จัดการร้านที่เลือกครบทุกสิทธิ์โดยอัตโนมัติ</p>
       <div class="grid gap-4 md:grid-cols-4">
         <input v-model="form.username" placeholder="Username" class="rounded-lg border px-3 py-2" required>
         <div class="relative">

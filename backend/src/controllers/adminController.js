@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs'
+import { createManagedAccount } from '../services/adminAccounts.js'
 import { pool, query } from '../config/database.js'
 
 function validRole(role) {
@@ -77,21 +78,12 @@ export async function createUser(req, res, next) {
     if (password.length < 8) return res.status(400).json({ message: 'Password must be at least 8 characters' })
     if (role === 'OWNER' && !storeId) return res.status(400).json({ message: 'storeId is required for OWNER' })
 
-    if (role === 'OWNER') {
-      const store = await query('SELECT id, status FROM stores WHERE id=$1', [storeId])
-      if (!store.rowCount || store.rows[0].status !== 'ACTIVE') {
-        return res.status(400).json({ message: 'Store not found or not active' })
-      }
-    }
-
     const hash = await bcrypt.hash(password, 12)
-    const result = await query(`
-      INSERT INTO users(username,password_hash,role,store_id,is_active)
-      VALUES($1,$2,$3,$4,true)
-      RETURNING id, username, role, store_id, is_active, created_at`,
-      [username, hash, role, role === 'OWNER' ? storeId : null])
+    const user = await createManagedAccount(pool, {
+      username, passwordHash: hash, role, storeId
+    })
 
-    res.status(201).json({ user: result.rows[0] })
+    res.status(201).json({ user })
   } catch (e) {
     if (e.code === '23505') return res.status(409).json({ message: 'Username already exists' })
     next(e)
