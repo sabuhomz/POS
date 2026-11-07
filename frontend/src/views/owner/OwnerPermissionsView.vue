@@ -117,7 +117,7 @@ onMounted(load)
                 <label v-for="[key, name] in group.entries" :key="key" class="check">
                   <input type="checkbox" :checked="selectedPermissions.includes(key)"
                     :disabled="saving" @change="toggle(key, $event.target.checked)" />
-                  <span><strong>{{ name }}</strong><small>{{ key }}</small></span>
+                  <span><strong>{{ name }}</strong></span>
                 </label>
               </div>
             </section>
