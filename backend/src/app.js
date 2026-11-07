@@ -11,6 +11,7 @@ import adminRoutes from './routes/admin.js'
 import productRoutes from './routes/products.js'
 import storeLifecycleRoutes from './routes/storeLifecycle.js'
 import ownerDashboardRoutes from './routes/ownerDashboard.js'
+import ownerPermissionsRoutes from './routes/ownerPermissions.js'
 import employeeRoutes from './routes/employees.js'
 import restockRoutes from './routes/restock.js'
 import promotionRoutes from './routes/promotions.js'
@@ -115,6 +116,8 @@ app.use(
   '/api/owner',
   ownerDashboardRoutes
 )
+
+app.use('/api/owner', ownerPermissionsRoutes)
 
 
 /*
