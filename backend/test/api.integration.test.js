@@ -144,6 +144,14 @@ await test('full API flow, invalid inputs, store isolation, and database failure
     const voided = (await query('SELECT correction_status FROM sales WHERE id=$1',[sold.saleId])).rows[0]
     assert.equal(voided.correction_status,'VOID')
     assert.equal((await query("SELECT status FROM product_items WHERE barcode='BC-001'")).rows[0].status,'IN_STOCK')
+    const resaleQuote = await request('POST', '/sales/quote', { barcodes: ['BC-001'] }, employee)
+    const resale = await request('POST', '/sales', {
+      barcodes: ['BC-001'], paymentMethod: 'QR',
+      paymentConfirmed: true, expectedTotal: resaleQuote.total
+    }, employee, 201)
+    assert.notEqual(resale.saleId, sold.saleId)
+    assert.equal((await query('SELECT COUNT(*)::int AS count FROM sale_unit_links WHERE product_item_id=(SELECT id FROM product_items WHERE barcode=$1)', ['BC-001'])).rows[0].count, 2)
+
     await request('POST', '/shifts/end', {}, employee)
     await request('GET', '/owner/sales-history', undefined, owner)
     await request('GET', '/owner/shifts', undefined, owner)
@@ -221,6 +229,6 @@ await test('full API flow, invalid inputs, store isolation, and database failure
     await setup()
     await request('GET', '/owner/dashboard', undefined, owner)
     assert.ok((await query('SELECT * FROM users')).rowCount >= 4)
-    assert.equal((await query('SELECT * FROM sales')).rowCount, 1)
+    assert.equal((await query('SELECT * FROM sales')).rowCount, 2)
   })
 })
