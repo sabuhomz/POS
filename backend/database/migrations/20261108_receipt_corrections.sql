@@ -6,9 +6,12 @@ ON CONFLICT(permission_key) DO NOTHING;
 ALTER TABLE sales ADD COLUMN IF NOT EXISTS correction_status VARCHAR(16) NOT NULL DEFAULT 'ACTIVE';
 CREATE TABLE IF NOT EXISTS sale_unit_links(
  sale_id BIGINT NOT NULL REFERENCES sales(id) ON DELETE CASCADE,
- product_item_id BIGINT NOT NULL UNIQUE REFERENCES product_items(id) ON DELETE RESTRICT,
+ product_item_id BIGINT NOT NULL REFERENCES product_items(id) ON DELETE RESTRICT,
  PRIMARY KEY(sale_id,product_item_id)
 );
+-- A returned barcode can be sold again and linked to a later receipt.
+-- Keep the original VOID receipt link as an immutable audit trail.
+ALTER TABLE sale_unit_links DROP CONSTRAINT IF EXISTS sale_unit_links_product_item_id_key;
 CREATE TABLE IF NOT EXISTS receipt_change_requests(
  id BIGSERIAL PRIMARY KEY,
  store_id BIGINT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
