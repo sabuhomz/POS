@@ -72,7 +72,7 @@ router.post('/', requirePermission('sale.create'), async (req,res,next)=>{
       !Array.isArray(barcodes)||!barcodes.length||barcodes.length>200||
       barcodes.some(x=>typeof x!=='string'||!x.trim()||x.length>150)||
       new Set(barcodes).size!==barcodes.length ||
-      typeof req.body?.expectedTotal!=='string' || !/^\\d+\\.\\d{2}$/.test(req.body.expectedTotal))
+      typeof req.body?.expectedTotal!=='string' || !/^\d+\.\d{2}$/.test(req.body.expectedTotal))
     return res.status(400).json({message:'ข้อมูลการขายไม่ถูกต้อง ต้องเป็นบาร์โค้ดไม่ซ้ำและชำระแบบ QR เท่านั้น'})
   const client=await pool.connect()
   try {
