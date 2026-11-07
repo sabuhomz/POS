@@ -1,7 +1,8 @@
 import express from 'express'
 import path from 'path'
 import cors from 'cors'
-import 'dotenv/config'
+import './config/environment.js'
+import { errorHandler } from './middleware/errorHandler.js'
 
 import authRoutes from './routes/auth.js'
 import adminRoutes from './routes/admin.js'
@@ -22,11 +23,11 @@ const app = express()
 
 app.locals.dbPool = pool
 
-// Allow local development and the current Vercel production frontend by default.
+// Allow local development by default.
 // For custom domains or additional frontends, set CORS_ORIGIN in the backend environment.
 const origins = (
   process.env.CORS_ORIGIN ||
-  'http://localhost:5173,https://pos-fawn-five.vercel.app'
+  'http://localhost:5173,http://127.0.0.1:5173'
 )
   .split(',')
   .map(x => x.trim())
@@ -178,13 +179,7 @@ app.use(
 |--------------------------------------------------------------------------
 */
 
-app.use((err, _req, res, _next) => {
-  console.error(err)
-
-  res.status(err.status || 500).json({
-    message: err.status ? err.message : 'Internal server error'
-  })
-})
+app.use(errorHandler)
 
 
 /*
@@ -199,6 +194,7 @@ const port = Number(
 
 app.listen(
   port,
+  process.env.HOST || '127.0.0.1',
   () => {
     console.log(
       `POS backend listening at http://localhost:${port}`

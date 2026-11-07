@@ -101,3 +101,17 @@ psql "$DATABASE_URL" -f database/schema.sql
 - Owner ส่งคำขอลบได้ครั้งละหนึ่งคำขอที่ยังเป็น `PENDING`
 - Admin ต้องอนุมัติจึงเปลี่ยนร้านเป็น `DELETED` และปิดใช้งาน Owner ของร้านนั้น
 - การอนุมัติ/ลบทำใน transaction เดียวกัน
+
+## แก้ Login ขึ้น Internal server error บน localhost
+
+1. หากยังไม่มี `.env` ให้คัดลอก `.env.example` เป็น `.env` ภายใน backend (อย่าเขียนทับไฟล์เดิม)
+2. ตั้ง `DB_NAME` ให้ตรงฐานข้อมูลจริง และใส่ `DB_PASSWORD` เป็นรหัสผ่าน PostgreSQL ของ `DB_USER`
+3. ตั้ง `JWT_SECRET` เป็นค่าสุ่มลับของเครื่องคุณ
+4. รัน `npm run check-db` ต้องแสดง PostgreSQL connected successfully แล้วจึงรัน `npm run dev`
+5. Frontend ใช้ `VITE_API_BASE_URL=http://localhost:5000/api` และรีสตาร์ตด้วย `npm run dev`
+
+Backend ฟังที่ 127.0.0.1 เป็นค่าเริ่มต้น ไม่ต้องใช้ ngrok
+ไฟล์ .env โหลดจากโฟลเดอร์ backend เสมอ แม้เรียกโปรแกรมจากโฟลเดอร์อื่น
+หากไม่ได้ตั้งรหัสผ่าน Backend จะหยุดพร้อมข้อความบอกวิธีแก้ ก่อนรับคำขอ Login
+รหัสผ่านผิดหรือ PostgreSQL ไม่ทำงานจะตอบ 503 พร้อมคำแนะนำ โดยไม่ส่งรหัสผ่านหรือรายละเอียด SQL กลับไป
+โค้ดไม่สามารถเดาหรือเปลี่ยนรหัสผ่าน PostgreSQL ในเครื่องคุณให้เองได้
