@@ -6,11 +6,13 @@ import { requireRole } from '../middleware/permission.js'
 const router = Router()
 router.use(authenticate, requireRole('OWNER'))
 
+// Only permissions exercised by the Python POS touchscreen app.
+// Other existing permissions remain untouched when the owner saves.
 const allowedKeys = [
-  'product.view', 'inventory.view', 'inventory.restock.request',
-  'sale.create', 'sale.view', 'report.view',
-  'report.daily', 'report.trend', 'report.top-products', 'report.weekly',
-  'promotion.view', 'inventory.restock.view'
+  'product.view',
+  'sale.create',
+  'inventory.restock.request',
+  'sale.view'
 ]
 
 router.get('/permissions/catalog', async (_req, res, next) => {
