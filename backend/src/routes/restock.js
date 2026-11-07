@@ -7,6 +7,7 @@ import { requirePermission } from '../middleware/permission.js'
 import {
   createRestockRequest,
   ownerAddStock,
+  employeeDirectAddStock,
   listRestockRequests,
   approveRestockRequest,
   rejectRestockRequest
@@ -28,6 +29,13 @@ router.post(
   createRestockRequest
 )
 
+
+// Employees explicitly granted direct stock-entry access.
+router.post(
+  '/direct',
+  requirePermission('inventory.restock.direct'),
+  employeeDirectAddStock
+)
 
 // ======================================================
 // OWNER
