@@ -80,6 +80,12 @@ const routes = [
         },
       },
       {
+        path: "permissions",
+        name: "owner-permissions",
+        component: () => import("../views/owner/OwnerPermissionsView.vue"),
+        meta: { roles: ["OWNER"] },
+      },
+      {
         path: "employees",
         name: "owner-employees",
         component: () => import("../views/owner/EmployeesView.vue"),
