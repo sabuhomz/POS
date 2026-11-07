@@ -3,10 +3,15 @@ import { ref, computed, onMounted } from 'vue'
 import api from '../../services/api'
 
 const groups = [
-  { title: 'การขาย', entries: [['sale.create', 'ขายสินค้า / สแกนบาร์โค้ด'], ['sale.view', 'ดูประวัติการขาย']] },
-  { title: 'สินค้าและสต็อก', entries: [['product.view', 'ดูรายการสินค้า'], ['inventory.view', 'ดูคลังสินค้า'], ['inventory.restock.request', 'ส่งคำขอเพิ่มสต็อก'], ['inventory.restock.view', 'ดูคำขอเพิ่มสต็อก']] },
-  { title: 'รายงาน', entries: [['report.view', 'ดูแดชบอร์ด'], ['report.daily', 'รายงานรายวัน'], ['report.trend', 'แนวโน้มยอดขาย'], ['report.top-products', 'สินค้าขายดี'], ['report.weekly', 'รายงานรายสัปดาห์']] },
-  { title: 'อื่น ๆ', entries: [['promotion.view', 'ดูโปรโมชั่น']] }
+  { title: 'ขายสินค้า', entries: [
+    ['sale.create', 'สแกนสินค้าเข้าตะกร้าและรับชำระ QR']
+  ] },
+  { title: 'เพิ่มสต็อก', entries: [
+    ['inventory.restock.request', 'สแกนเพิ่มสินค้าและส่งคำขออนุมัติ']
+  ] },
+  { title: 'ประวัติการขาย', entries: [
+    ['sale.view', 'ดูประวัติการขายและรายละเอียดใบเสร็จ']
+  ] }
 ]
 const employees = ref([])
 const catalog = ref([])
@@ -75,7 +80,7 @@ onMounted(load)
     <div class="heading">
       <div>
         <h1>กำหนดสิทธิ์พนักงาน</h1>
-        <p>เจ้าของร้านเลือกการเข้าถึงของพนักงานภายในร้านตนเองได้</p>
+        <p>กำหนดการใช้งานเฉพาะ 3 หน้าของแอป POS สำหรับพนักงาน</p>
       </div>
       <button class="secondary" type="button" :disabled="loading || saving" @click="load">↻ รีเฟรช</button>
     </div>
@@ -124,7 +129,7 @@ onMounted(load)
               {{ saving ? 'กำลังบันทึก...' : 'บันทึกสิทธิ์พนักงาน' }}
             </button>
           </div>
-          <p class="footnote">สิทธิ์ผู้ดูแลระบบและการแก้ไขข้อมูลสำคัญไม่ได้เปิดให้กำหนดจากหน้านี้ เพื่อป้องกันการให้สิทธิ์เกินจำเป็น</p>
+          <p class="footnote">ระบบจะให้สิทธิ์อ่านข้อมูลสินค้าพื้นฐานที่แอปต้องใช้โดยอัตโนมัติเมื่อบันทึก โดยไม่เปิดสิทธิ์จัดการเว็บไซต์ การเริ่ม/จบกะใช้ได้สำหรับบัญชีพนักงาน ส่วนการเพิ่มสต็อกทันทีสงวนไว้สำหรับเจ้าของร้าน</p>
         </template>
         <p v-else>เลือกพนักงานเพื่อกำหนดสิทธิ์</p>
       </div>
