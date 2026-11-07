@@ -189,13 +189,23 @@ export async function createRestockRequest(req, res, next) {
 // เพิ่ม Stock โดยตรง
 // ======================================================
 
+// Called only after the new route's permission middleware checks direct access.
+export function employeeDirectAddStock(req, res, next) {
+  if (req.user.role !== 'EMPLOYEE') {
+    return res.status(403).json({ message: 'เฉพาะพนักงานที่ได้รับสิทธิ์เท่านั้น' })
+  }
+  req.employeeDirectRestock = true
+  return ownerAddStock(req, res, next)
+}
+
 export async function ownerAddStock(req, res, next) {
   let client
   try {
     client = await pool.connect()
-    if (req.user.role !== 'OWNER' && req.user.role !== 'ADMIN') {
+    if (req.user.role !== 'OWNER' && req.user.role !== 'ADMIN' &&
+        !(req.user.role === 'EMPLOYEE' && req.employeeDirectRestock === true)) {
       return res.status(403).json({
-        message: 'เฉพาะ OWNER เท่านั้นที่เพิ่ม Stock โดยตรงได้'
+        message: 'ไม่มีสิทธิ์เพิ่ม Stock โดยตรง'
       })
     }
 
