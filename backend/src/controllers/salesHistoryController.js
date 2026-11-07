@@ -76,6 +76,7 @@ export async function getSalesHistory(req, res, next) {
          s.tax,
          s.total,
          s.payment_method AS "paymentMethod",
+         s.correction_status AS "correctionStatus",
          s.created_at AS "createdAt",
          u.username AS "employeeUsername",
          COALESCE(
