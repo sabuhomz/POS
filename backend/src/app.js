@@ -164,7 +164,9 @@ app.use(
 
 
 app.use('/api/sales', salesRoutes)
-app.use('/api/receipts', saleCorrectionRoutes)/*
+app.use('/api/receipts', saleCorrectionRoutes)
+
+/*
 |--------------------------------------------------------------------------
 | STORE
 |--------------------------------------------------------------------------
