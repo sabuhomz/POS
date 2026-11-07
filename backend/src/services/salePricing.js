@@ -93,15 +93,19 @@ export async function priceCart(query, storeId, byProduct) {
       best = discount
     }
   }
-  // Allocate overall discount proportionally by line, adjusting the last line
-  // so that sum of line totals equals the receipt total exactly.
+  // Discount only participating products; line totals sum to the receipt total.
   const lines = []
+  const eligibleIds = new Set(applied ? applied.products.map(product => product.id) : [])
+  const eligibleItems = items.filter(item => eligibleIds.has(item.id))
+  const lastEligibleId = eligibleItems.length ? eligibleItems[eligibleItems.length - 1].id : null
   let remainingDiscount = best
-  let remainingGross = subtotal
+  let remainingGross = eligibleItems.reduce((sum, item) =>
+    sum + item.price * BigInt(item.quantity), 0n)
   for (let index = 0; index < items.length; index++) {
     const item = items[index]
     const gross = item.price * BigInt(item.quantity)
-    const share = index === items.length - 1 ? remainingDiscount :
+    const share = !eligibleIds.has(item.id) ? 0n :
+      item.id === lastEligibleId ? remainingDiscount :
       remainingGross > 0n ? (remainingDiscount * gross / remainingGross) : 0n
     lines.push({
       id: item.id, name: item.name, quantity: item.quantity,
