@@ -1,0 +1,1 @@
+import{_ as s,c as t,b as o,o as c}from"./index-khT5F_li.js";const n={},r={class:"rounded-xl bg-white p-8 shadow"};function a(d,e){return c(),t("div",r,[...e[0]||(e[0]=[o("h1",{class:"text-2xl font-bold"},"คำขอเพิ่มจำนวนสินค้า",-1)])])}const _=s(n,[["render",a]]);export{_ as default};

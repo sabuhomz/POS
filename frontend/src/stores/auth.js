@@ -48,6 +48,7 @@ export const useAuthStore = defineStore("auth", () => {
     return user.value;
   }
   function initialize() {
+    localStorage.removeItem("frontend_demo_session");
     const t = localStorage.getItem("access_token");
     if (!t || isTokenExpired(t)) {
       logout();

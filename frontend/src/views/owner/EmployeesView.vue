@@ -67,12 +67,33 @@
               : 'Password'
             }}
           </label>
-          <input
-            v-model="form.password"
-            type="password"
-            autocomplete="new-password"
-            placeholder="อย่างน้อย 8 ตัวอักษร"
-          />
+          <div class="password-input-wrap">
+            <input
+              v-model="form.password"
+              :type="showEmployeePassword ? 'text' : 'password'"
+              autocomplete="new-password"
+              placeholder="อย่างน้อย 8 ตัวอักษร"
+            />
+            <button
+              type="button"
+              class="password-toggle"
+              :aria-label="showEmployeePassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'"
+              :title="showEmployeePassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'"
+              @click="showEmployeePassword = !showEmployeePassword"
+            >
+              <svg v-if="showEmployeePassword" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 3l18 18" />
+                <path d="M10.6 10.6a2 2 0 002.8 2.8" />
+                <path d="M9.9 5.2A10.8 10.8 0 0112 5c5 0 8.3 4.5 9 7-.3 1.1-1.2 2.6-2.6 3.9M6.2 6.2C3.9 7.7 2.4 10 2 12c.7 2.5 4 7 10 7 1.1 0 2.1-.2 3-.5" />
+              </svg>
+              <svg v-else xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -191,6 +212,7 @@ const showForm = ref(false)
 const editingEmployee = ref(null)
 
 const errorMessage = ref('')
+const showEmployeePassword = ref(false)
 
 const form = ref({
   firstName: '',
@@ -221,6 +243,7 @@ function resetForm() {
 
 function openCreateForm() {
   resetForm()
+  showEmployeePassword.value = false
   errorMessage.value = ''
   showForm.value = true
 }
@@ -233,6 +256,7 @@ function openEditForm(employee) {
     username: employee.username,
     password: ''
   }
+  showEmployeePassword.value = false
   errorMessage.value = ''
   showForm.value = true
 }
@@ -430,6 +454,40 @@ onMounted(() => {
   box-sizing: border-box;
   border: 1px solid #ccc;
   border-radius: 5px;
+}
+
+.password-input-wrap {
+  position: relative;
+}
+
+.password-input-wrap input {
+  padding-right: 44px;
+}
+
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  display: grid;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  place-items: center;
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #64748b;
+}
+
+.password-toggle:hover {
+  background: #f1f5f9;
+  color: #1f2937;
+}
+
+.password-toggle svg {
+  width: 18px;
+  height: 18px;
 }
 
 .input-group input:disabled {

@@ -2,6 +2,7 @@
 import { ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import AccountBadge from '../components/AccountBadge.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -54,6 +55,9 @@ watch(() => route.path, closeMenu)
     </aside>
 
     <main class="owner-main">
+      <div class="account-bar">
+        <AccountBadge />
+      </div>
       <RouterView />
     </main>
   </div>
@@ -144,6 +148,12 @@ watch(() => route.path, closeMenu)
   margin-left: 250px;
   min-height: 100dvh;
   padding: 32px clamp(24px, 3vw, 48px);
+}
+
+.account-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 20px;
 }
 
 .mobile-topbar,

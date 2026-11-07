@@ -12,6 +12,64 @@
       </div>
     </div>
 
+    <section class="overflow-hidden rounded-xl border border-blue-100 bg-white shadow">
+      <div class="flex flex-wrap items-end justify-between gap-4 border-b bg-blue-50/70 p-6">
+        <div>
+          <h2 class="text-lg font-bold">ยอดขายแยกตามกะพนักงาน</h2>
+          <p class="mt-1 text-sm text-gray-600">ตรวจสอบเวลาเริ่ม-จบกะ จำนวนบิล และยอดขายของพนักงานแต่ละคน</p>
+        </div>
+        <div class="flex flex-wrap items-end gap-3">
+          <label class="text-sm text-gray-700">ตั้งแต่
+            <input v-model="shiftFrom" type="date" class="mt-1 block rounded-lg border bg-white px-3 py-2">
+          </label>
+          <label class="text-sm text-gray-700">ถึง
+            <input v-model="shiftTo" type="date" class="mt-1 block rounded-lg border bg-white px-3 py-2">
+          </label>
+          <button type="button" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50" :disabled="shiftLoading" @click="loadShifts">
+            {{ shiftLoading ? 'กำลังโหลด...' : 'ค้นหากะ' }}
+          </button>
+        </div>
+      </div>
+
+      <p v-if="shiftError" class="m-5 rounded-lg bg-red-50 p-3 text-sm text-red-700" role="alert">{{ shiftError }}</p>
+
+      <div class="grid gap-3 border-b p-5 sm:grid-cols-3">
+        <div class="rounded-lg bg-gray-50 p-4"><p class="text-sm text-gray-500">จำนวนกะ</p><p class="mt-1 text-xl font-bold">{{ shiftRows.length }}</p></div>
+        <div class="rounded-lg bg-gray-50 p-4"><p class="text-sm text-gray-500">จำนวนบิลในกะ</p><p class="mt-1 text-xl font-bold">{{ shiftOrderCount }}</p></div>
+        <div class="rounded-lg bg-gray-50 p-4"><p class="text-sm text-gray-500">ยอดขายรวมในกะ</p><p class="mt-1 text-xl font-bold text-blue-700">{{ money(shiftSalesTotal) }}</p></div>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-left text-sm">
+          <thead class="border-b bg-gray-50">
+            <tr>
+              <th class="px-4 py-3">พนักงาน</th>
+              <th class="px-4 py-3">เริ่มกะ</th>
+              <th class="px-4 py-3">จบกะ</th>
+              <th class="px-4 py-3 text-right">บิล</th>
+              <th class="px-4 py-3 text-right">ยอดขาย</th>
+              <th class="px-4 py-3">สถานะ</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="shiftLoading"><td colspan="6" class="p-8 text-center text-gray-500">กำลังโหลดรายงานกะ...</td></tr>
+            <tr v-else-if="shiftRows.length === 0"><td colspan="6" class="p-8 text-center text-gray-500">ไม่พบกะในช่วงวันที่เลือก</td></tr>
+            <template v-else>
+              <tr v-for="shift in shiftRows" :key="shift.id" class="border-b last:border-0 hover:bg-gray-50">
+                <td class="whitespace-nowrap px-4 py-3 font-medium">{{ shift.employeeUsername }}</td>
+                <td class="whitespace-nowrap px-4 py-3">{{ formatDate(shift.startedAt) }}</td>
+                <td class="whitespace-nowrap px-4 py-3">{{ shift.endedAt ? formatDate(shift.endedAt) : '-' }}</td>
+                <td class="px-4 py-3 text-right">{{ shift.orderCount }}</td>
+                <td class="whitespace-nowrap px-4 py-3 text-right font-semibold">{{ money(shift.totalSales) }}</td>
+                <td class="px-4 py-3"><span class="rounded-full px-2.5 py-1 text-xs" :class="shift.endedAt ? 'bg-gray-100 text-gray-700' : 'bg-green-100 text-green-700'">{{ shift.endedAt ? 'จบกะแล้ว' : 'กำลังทำงาน' }}</span></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+      <p class="border-t px-5 py-3 text-xs text-gray-500">ยอดขายคำนวณจากรายการที่ผูกกับบัญชีพนักงานและเกิดขึ้นระหว่างเวลาเริ่มกะถึงจบกะ</p>
+    </section>
+
     <div class="rounded-xl bg-white p-6 shadow">
       <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         <div>
@@ -119,8 +177,9 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { getSalesHistory } from '../../services/sales'
+import api from '../../services/api'
 
 const loading = ref(false)
 const errorMessage = ref('')
@@ -128,6 +187,15 @@ const sales = ref([])
 const selectedSale = ref(null)
 const filters = reactive({ search: '', paymentMethod: '', from: '', to: '' })
 const pagination = reactive({ page: 1, limit: 20, total: 0, totalPages: 0 })
+const shiftRows = ref([])
+const shiftLoading = ref(false)
+const shiftError = ref('')
+const today = new Date()
+const localToday = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+const shiftFrom = ref(localToday)
+const shiftTo = ref(localToday)
+const shiftOrderCount = computed(() => shiftRows.value.reduce((sum, shift) => sum + Number(shift.orderCount || 0), 0))
+const shiftSalesTotal = computed(() => shiftRows.value.reduce((sum, shift) => sum + Number(shift.totalSales || 0), 0))
 
 function money(value) {
   return new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(Number(value || 0))
@@ -165,6 +233,22 @@ async function loadSales() {
   }
 }
 
+async function loadShifts() {
+  shiftLoading.value = true
+  shiftError.value = ''
+  try {
+    const { data } = await api.get('/owner/shifts', {
+      params: { from: shiftFrom.value || undefined, to: shiftTo.value || undefined }
+    })
+    shiftRows.value = Array.isArray(data?.shifts) ? data.shifts : []
+  } catch (error) {
+    shiftRows.value = []
+    shiftError.value = error.response?.data?.message || 'ไม่สามารถโหลดรายงานกะพนักงานได้'
+  } finally {
+    shiftLoading.value = false
+  }
+}
+
 function applyFilters() {
   pagination.page = 1
   loadSales()
@@ -181,5 +265,8 @@ function changePage(page) {
   loadSales()
 }
 
-onMounted(loadSales)
+onMounted(() => {
+  loadSales()
+  loadShifts()
+})
 </script>

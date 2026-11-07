@@ -8,14 +8,21 @@ CREATE TABLE IF NOT EXISTS stores (
   name VARCHAR(150) NOT NULL,
   status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE'
     CHECK (status IN ('ACTIVE', 'SUSPENDED', 'DELETED')),
+  deleted_at TIMESTAMPTZ,
+  retention_until TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE stores ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+ALTER TABLE stores ADD COLUMN IF NOT EXISTS retention_until TIMESTAMPTZ;
 
 CREATE TABLE IF NOT EXISTS users (
   id BIGSERIAL PRIMARY KEY,
   username VARCHAR(100) UNIQUE NOT NULL,
   password_hash TEXT NOT NULL,
+  first_name VARCHAR(100),
+  last_name VARCHAR(100),
   role VARCHAR(20) NOT NULL
     CHECK (role IN ('ADMIN', 'OWNER', 'EMPLOYEE')),
   store_id BIGINT REFERENCES stores(id) ON DELETE SET NULL,
@@ -23,6 +30,26 @@ CREATE TABLE IF NOT EXISTS users (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS first_name VARCHAR(100);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_name VARCHAR(100);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS recovery_email VARCHAR(254);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS recovery_email_verified_at TIMESTAMPTZ;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_verified_recovery_email
+  ON users (LOWER(recovery_email)) WHERE recovery_email_verified_at IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS recovery_email_codes (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
+  email VARCHAR(254) NOT NULL,
+  purpose VARCHAR(10) NOT NULL CHECK (purpose IN ('LINK','RESET')),
+  code_hash CHAR(64) NOT NULL,
+  attempts SMALLINT NOT NULL DEFAULT 0,
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_recovery_email_codes_lookup
+  ON recovery_email_codes (email, user_id, purpose, expires_at DESC);
 
 CREATE TABLE IF NOT EXISTS permissions (
   permission_key VARCHAR(100) PRIMARY KEY,
@@ -53,14 +80,46 @@ CREATE TABLE IF NOT EXISTS products (
 CREATE TABLE IF NOT EXISTS promotions (
   id BIGSERIAL PRIMARY KEY,
   store_id BIGINT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
-  name VARCHAR(150) NOT NULL,
-  discount_type VARCHAR(20) NOT NULL CHECK (discount_type IN ('PERCENT', 'FIXED')),
-  discount_value NUMERIC(12,2) NOT NULL CHECK (discount_value >= 0),
-  starts_at TIMESTAMPTZ,
-  ends_at TIMESTAMPTZ,
+  name VARCHAR(200) NOT NULL,
+  promotion_type VARCHAR(40) NOT NULL DEFAULT 'FIXED_DISCOUNT'
+    CHECK (promotion_type IN ('BUNDLE_PRICE','PERCENT_DISCOUNT','FIXED_DISCOUNT','QUANTITY_PRICE','QUANTITY_PERCENT','QUANTITY_FIXED','AMOUNT_PERCENT','AMOUNT_FIXED')),
+  description TEXT,
+  start_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  end_at TIMESTAMPTZ,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  priority INTEGER NOT NULL DEFAULT 0,
+  created_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CHECK (end_at IS NULL OR end_at > start_at)
 );
+
+-- Upgrade databases created with the earlier discount_type/discount_value model.
+ALTER TABLE promotions ADD COLUMN IF NOT EXISTS promotion_type VARCHAR(40) NOT NULL DEFAULT 'FIXED_DISCOUNT';
+ALTER TABLE promotions ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE promotions ADD COLUMN IF NOT EXISTS start_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+ALTER TABLE promotions ADD COLUMN IF NOT EXISTS end_at TIMESTAMPTZ;
+ALTER TABLE promotions ADD COLUMN IF NOT EXISTS priority INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE promotions ADD COLUMN IF NOT EXISTS created_by BIGINT REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE promotions ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+ALTER TABLE promotions ALTER COLUMN name TYPE VARCHAR(200);
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='promotions' AND column_name='discount_type') THEN
+    EXECUTE $q$UPDATE promotions SET promotion_type=CASE WHEN discount_type='PERCENT' THEN 'PERCENT_DISCOUNT' ELSE 'FIXED_DISCOUNT' END$q$;
+    EXECUTE $q$ALTER TABLE promotions ALTER COLUMN discount_type SET DEFAULT 'FIXED'$q$;
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='promotions' AND column_name='discount_value') THEN
+    EXECUTE $q$ALTER TABLE promotions ALTER COLUMN discount_value SET DEFAULT 0$q$;
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='promotions' AND column_name='starts_at') THEN
+    EXECUTE $q$UPDATE promotions SET start_at=COALESCE(starts_at,start_at)$q$;
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='promotions' AND column_name='ends_at') THEN
+    EXECUTE $q$UPDATE promotions SET end_at=COALESCE(ends_at,end_at)$q$;
+  END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS sales (
   id BIGSERIAL PRIMARY KEY,
@@ -75,6 +134,21 @@ CREATE TABLE IF NOT EXISTS sales (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (store_id, receipt_number)
 );
+
+-- Employee shift boundaries used to attribute sales to an employee's active shift.
+CREATE TABLE IF NOT EXISTS employee_shifts (
+  id BIGSERIAL PRIMARY KEY,
+  store_id BIGINT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+  employee_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  employee_username VARCHAR(100) NOT NULL,
+  started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  ended_at TIMESTAMPTZ,
+  CHECK (ended_at IS NULL OR ended_at >= started_at)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_employee_shifts_one_open_per_employee
+  ON employee_shifts (employee_id) WHERE ended_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_employee_shifts_store_started
+  ON employee_shifts (store_id, started_at DESC);
 
 CREATE TABLE IF NOT EXISTS sale_items (
   id BIGSERIAL PRIMARY KEY,
@@ -96,8 +170,11 @@ CREATE TABLE IF NOT EXISTS restock_requests (
   status VARCHAR(20) NOT NULL DEFAULT 'PENDING'
     CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  decided_at TIMESTAMPTZ
+  decided_at TIMESTAMPTZ,
+  decided_by BIGINT REFERENCES users(id) ON DELETE SET NULL
 );
+
+ALTER TABLE restock_requests ADD COLUMN IF NOT EXISTS decided_by BIGINT REFERENCES users(id) ON DELETE SET NULL;
 
 -- Indexes for common POS/report queries.
 CREATE INDEX IF NOT EXISTS idx_users_store_id ON users(store_id);
@@ -201,7 +278,6 @@ INSERT INTO permissions (permission_key, description) VALUES
 ('report.weekly', 'Weekly sales report'),
 ('inventory.restock.request', 'Request stock using unique barcodes'),
 ('inventory.restock.view', 'View restock requests'),
-('inventory.restock.approve', 'Approve restock requests'),
 ('inventory.restock.reject', 'Reject restock requests')
 ON CONFLICT (permission_key) DO UPDATE
 SET description = EXCLUDED.description;
@@ -214,10 +290,17 @@ CREATE TABLE IF NOT EXISTS store_deletion_requests (
   owner_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
   reason TEXT NOT NULL DEFAULT '',
   status VARCHAR(20) NOT NULL DEFAULT 'PENDING'
-    CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED')),
+    CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED', 'CANCELLED')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  decided_at TIMESTAMPTZ
+  decided_at TIMESTAMPTZ,
+  account_states JSONB NOT NULL DEFAULT '[]'::jsonb,
+  restored_at TIMESTAMPTZ
 );
+ALTER TABLE store_deletion_requests ADD COLUMN IF NOT EXISTS account_states JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE store_deletion_requests ADD COLUMN IF NOT EXISTS restored_at TIMESTAMPTZ;
+ALTER TABLE store_deletion_requests DROP CONSTRAINT IF EXISTS store_deletion_requests_status_check;
+ALTER TABLE store_deletion_requests ADD CONSTRAINT store_deletion_requests_status_check
+  CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'));
 CREATE INDEX IF NOT EXISTS idx_store_deletion_requests_status ON store_deletion_requests(status);
 CREATE INDEX IF NOT EXISTS idx_store_deletion_requests_store ON store_deletion_requests(store_id);
 

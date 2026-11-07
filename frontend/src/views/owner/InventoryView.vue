@@ -15,6 +15,14 @@
       <div class="flex gap-2">
         <button
           type="button"
+          class="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-amber-800 hover:bg-amber-100 disabled:opacity-50"
+          :disabled="slowMovingLoading"
+          @click="toggleSlowMoving"
+        >
+          {{ slowMovingLoading ? 'กำลังตรวจสอบ...' : showSlowMoving ? 'ซ่อนรายการสินค้าค้างสต็อก' : 'เช็กรายการสินค้าค้างสต็อก' }}
+        </button>
+        <button
+          type="button"
           class="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
           @click="openCreateModal"
         >
@@ -31,6 +39,58 @@
         </button>
       </div>
     </div>
+
+    <section v-if="showSlowMoving" class="overflow-hidden rounded-xl border border-amber-200 bg-white shadow-sm">
+      <div class="flex flex-col justify-between gap-3 border-b border-amber-100 bg-amber-50 p-4 sm:flex-row sm:items-center">
+        <div>
+          <h2 class="font-semibold text-gray-900">รายการสินค้าค้างสต็อก</h2>
+          <p class="mt-1 text-sm text-gray-600">สินค้าในสต็อกที่ไม่มีการขายตามช่วงเวลาที่เลือก</p>
+        </div>
+        <label class="flex items-center gap-2 text-sm text-gray-700">
+          ไม่ได้ขายอย่างน้อย
+          <select v-model.number="slowMovingDays" class="rounded-lg border bg-white px-3 py-2" @change="loadSlowMovingInventory">
+            <option :value="30">30 วัน</option>
+            <option :value="60">60 วัน</option>
+            <option :value="90">90 วัน</option>
+          </select>
+        </label>
+      </div>
+      <p v-if="slowMovingError" class="m-4 rounded-lg bg-red-50 p-3 text-sm text-red-700" role="alert">{{ slowMovingError }}</p>
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-left text-sm">
+          <thead class="border-b bg-gray-50">
+            <tr>
+              <th class="p-4 font-semibold">สินค้า</th>
+              <th class="p-4 font-semibold">SKU</th>
+              <th class="p-4 font-semibold">หมวดหมู่</th>
+              <th class="p-4 text-right font-semibold">คงเหลือ</th>
+              <th class="p-4 text-right font-semibold">ราคา</th>
+              <th class="p-4 font-semibold">ขายล่าสุด</th>
+              <th class="p-4 text-right font-semibold">วันที่ไม่ขาย</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="slowMovingLoading">
+              <td colspan="7" class="p-8 text-center text-gray-500">กำลังตรวจสอบประวัติสินค้า...</td>
+            </tr>
+            <tr v-else-if="slowMovingProducts.length === 0">
+              <td colspan="7" class="p-8 text-center text-gray-500">ไม่พบสินค้าค้างสต็อกเกิน {{ slowMovingDays }} วัน</td>
+            </tr>
+            <template v-else>
+              <tr v-for="product in slowMovingProducts" :key="product.id" class="border-b last:border-0 hover:bg-gray-50">
+                <td class="p-4 font-medium text-gray-900">{{ product.name }}</td>
+                <td class="whitespace-nowrap p-4">{{ product.sku || '-' }}</td>
+                <td class="whitespace-nowrap p-4">{{ product.category || '-' }}</td>
+                <td class="whitespace-nowrap p-4 text-right font-semibold">{{ product.stock }}</td>
+                <td class="whitespace-nowrap p-4 text-right">{{ formatMoney(product.price) }}</td>
+                <td class="whitespace-nowrap p-4">{{ product.lastSoldAt ? formatDate(product.lastSoldAt) : 'ยังไม่เคยขาย' }}</td>
+                <td class="whitespace-nowrap p-4 text-right font-semibold text-amber-700">{{ product.daysWithoutSale }} วัน</td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </section>
 
     <!-- Error -->
     <div
@@ -249,11 +309,17 @@ import {
   updateProduct,
   deleteProduct
 } from '../../services/products'
+import api from '../../services/api'
 
 const products = ref([])
 const loading = ref(false)
 const saving = ref(false)
 const errorMessage = ref('')
+const showSlowMoving = ref(false)
+const slowMovingLoading = ref(false)
+const slowMovingError = ref('')
+const slowMovingDays = ref(30)
+const slowMovingProducts = ref([])
 
 const search = ref('')
 const categoryFilter = ref('')
@@ -348,6 +414,33 @@ async function loadProducts() {
   } finally {
     loading.value = false
   }
+}
+
+async function toggleSlowMoving() {
+  showSlowMoving.value = !showSlowMoving.value
+  if (showSlowMoving.value) await loadSlowMovingInventory()
+}
+
+async function loadSlowMovingInventory() {
+  slowMovingLoading.value = true
+  slowMovingError.value = ''
+  try {
+    const { data } = await api.get('/owner/slow-moving-inventory', {
+      params: { days: slowMovingDays.value }
+    })
+    slowMovingProducts.value = Array.isArray(data.products) ? data.products : []
+  } catch (error) {
+    slowMovingProducts.value = []
+    slowMovingError.value = error.response?.data?.message || 'ไม่สามารถตรวจสอบรายการสินค้าค้างสต็อกได้'
+  } finally {
+    slowMovingLoading.value = false
+  }
+}
+
+function formatDate(value) {
+  return new Intl.DateTimeFormat('th-TH', {
+    day: '2-digit', month: '2-digit', year: 'numeric'
+  }).format(new Date(value))
 }
 
 function getImageUrl(imageUrl) {

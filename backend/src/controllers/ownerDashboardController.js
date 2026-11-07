@@ -81,3 +81,47 @@ export async function getOwnerDashboard(req, res, next) {
     next(error)
   }
 }
+
+export async function getSlowMovingInventory(req, res, next) {
+  try {
+    const storeId = req.user.storeId
+    const parsedDays = Number.parseInt(req.query.days, 10)
+    const days = [30, 60, 90].includes(parsedDays) ? parsedDays : 30
+    const result = await query(
+      `SELECT
+         p.id,
+         p.name,
+         p.sku,
+         p.category,
+         p.stock,
+         p.price,
+         latest.last_sold_at AS "lastSoldAt",
+         COALESCE(latest.last_sold_at, p.created_at) AS "trackingSince",
+         GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (NOW() - COALESCE(latest.last_sold_at, p.created_at))) / 86400))::int AS "daysWithoutSale"
+       FROM products p
+       LEFT JOIN LATERAL (
+         SELECT MAX(s.created_at) AS last_sold_at
+         FROM sale_items si
+         JOIN sales s ON s.id = si.sale_id
+         WHERE si.product_id = p.id AND s.store_id = p.store_id
+       ) latest ON TRUE
+       WHERE p.store_id = $1
+         AND p.stock > 0
+         AND COALESCE(latest.last_sold_at, p.created_at) <= NOW() - ($2 * INTERVAL '1 day')
+       ORDER BY "daysWithoutSale" DESC, p.stock DESC, p.name ASC`,
+      [storeId, days]
+    )
+
+    res.json({
+      days,
+      products: result.rows.map((product) => ({
+        ...product,
+        stock: Number(product.stock),
+        price: Number(product.price),
+        daysWithoutSale: Number(product.daysWithoutSale)
+      }))
+    })
+  } catch (error) {
+    next(error)
+  }
+}

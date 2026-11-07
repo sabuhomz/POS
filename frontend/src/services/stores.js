@@ -23,10 +23,20 @@ export async function listDeleteRequests() {
 
 export async function reviewDeleteRequest(id, decision) {
   const { data } = await api.patch(`/admin/store-delete-requests/${id}`, { decision })
-  return data.request || data.store
+  return data
+}
+
+export async function restoreDeletedStore(id) {
+  const { data } = await api.post(`/admin/stores/${id}/restore`)
+  return data.store
 }
 
 export async function requestStoreDeletion(reason = '') {
   const { data } = await api.post('/stores/delete-requests', { reason })
+  return data.request
+}
+
+export async function cancelStoreDeletionRequest() {
+  const { data } = await api.patch('/stores/delete-requests/me/cancel')
   return data.request
 }

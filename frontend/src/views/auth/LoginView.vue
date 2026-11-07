@@ -45,6 +45,7 @@ async function submit() {
     loading.value = false;
   }
 }
+
 </script>
 
 <template>
@@ -88,5 +89,10 @@ async function submit() {
     >
       {{ loading ? "Signing in..." : "Sign in" }}
     </button>
+
+    <RouterLink to="/forgot-password" class="mt-4 block text-center text-sm text-blue-600 hover:underline">
+      ลืมรหัสผ่าน?
+    </RouterLink>
+
   </form>
 </template>

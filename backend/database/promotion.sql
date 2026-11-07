@@ -52,6 +52,33 @@ CREATE TABLE IF NOT EXISTS promotions (
   CHECK (end_at IS NULL OR end_at > start_at)
 );
 
+-- Upgrade older databases that stored only discount_type/discount_value.
+ALTER TABLE promotions ADD COLUMN IF NOT EXISTS promotion_type VARCHAR(40) NOT NULL DEFAULT 'FIXED_DISCOUNT';
+ALTER TABLE promotions ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE promotions ADD COLUMN IF NOT EXISTS start_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+ALTER TABLE promotions ADD COLUMN IF NOT EXISTS end_at TIMESTAMPTZ;
+ALTER TABLE promotions ADD COLUMN IF NOT EXISTS priority INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE promotions ADD COLUMN IF NOT EXISTS created_by BIGINT REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE promotions ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+ALTER TABLE promotions ALTER COLUMN name TYPE VARCHAR(200);
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='promotions' AND column_name='discount_type') THEN
+    EXECUTE $q$UPDATE promotions SET promotion_type=CASE WHEN discount_type='PERCENT' THEN 'PERCENT_DISCOUNT' ELSE 'FIXED_DISCOUNT' END$q$;
+    EXECUTE $q$ALTER TABLE promotions ALTER COLUMN discount_type SET DEFAULT 'FIXED'$q$;
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='promotions' AND column_name='discount_value') THEN
+    EXECUTE $q$ALTER TABLE promotions ALTER COLUMN discount_value SET DEFAULT 0$q$;
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='promotions' AND column_name='starts_at') THEN
+    EXECUTE $q$UPDATE promotions SET start_at=COALESCE(starts_at,start_at)$q$;
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='promotions' AND column_name='ends_at') THEN
+    EXECUTE $q$UPDATE promotions SET end_at=COALESCE(ends_at,end_at)$q$;
+  END IF;
+END $$;
+
 CREATE INDEX IF NOT EXISTS idx_promotions_store
   ON promotions(store_id);
 

@@ -5,6 +5,10 @@
       <p class="mt-1 text-sm text-gray-500">คำขอจะยังไม่ลบร้านจนกว่า Admin จะอนุมัติ</p>
     </div>
 
+    <div v-if="errorMessage" class="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700" role="alert">
+      {{ errorMessage }}
+    </div>
+
     <!-- กรณีที่ 1: สถานะ PENDING (รออนุมัติ) ให้ซ่อนฟอร์มและแสดงข้อความรอ -->
     <div v-if="currentRequest && currentRequest.status === 'PENDING'" class="rounded-xl border bg-white p-6 shadow-sm">
       <div class="flex items-center text-blue-700 bg-blue-50 p-4 rounded-lg">
@@ -14,6 +18,14 @@
         คุณได้ยื่นคำขอปิดร้านไปแล้วเมื่อ {{ formatDate(currentRequest.created_at) }}<br>
         กรุณารอผู้ดูแลระบบดำเนินการอนุมัติ
       </p>
+      <button
+        type="button"
+        class="mt-5 rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+        :disabled="isCancelling"
+        @click="cancelDeletionRequest"
+      >
+        {{ isCancelling ? 'กำลังยกเลิก...' : 'ยกเลิกคำขอ' }}
+      </button>
     </div>
 
     <!-- กรณีที่ 2: ไม่มีคำขอเลย หรือ คำขอล่าสุดถูก REJECTED ให้แสดงฟอร์มยื่นใหม่ -->
@@ -23,6 +35,11 @@
       <div v-if="currentRequest && currentRequest.status === 'REJECTED'" class="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
         <p class="font-bold mb-1">สถานะคำขอล่าสุด: REJECTED (ถูกปฏิเสธ)</p>
         <p class="text-sm">คำขอปิดร้านก่อนหน้าของคุณไม่ได้รับการอนุมัติ หากคุณยังต้องการปิดร้านอยู่ คุณสามารถระบุเหตุผลเพื่อยื่นคำขอใหม่ได้ที่ฟอร์มด้านล่าง</p>
+      </div>
+
+      <div v-if="currentRequest && currentRequest.status === 'CANCELLED'" class="mb-6 rounded-lg border border-gray-200 bg-gray-50 p-4 text-gray-700">
+        <p class="font-bold mb-1">คำขอล่าสุดถูกยกเลิกแล้ว</p>
+        <p class="text-sm">คำขอนี้ถูกนำออกจากคิวรอของ Admin แล้ว หากยังต้องการปิดร้าน สามารถยื่นคำขอใหม่ได้ด้านล่าง</p>
       </div>
 
       <!-- ฟอร์มยื่นคำขอปิดร้าน -->
@@ -55,11 +72,14 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import axios from 'axios';
+import { cancelStoreDeletionRequest } from '../../services/stores';
 
 const API_URL = import.meta.env.VITE_API_BASE_URL;
 const currentRequest = ref(null);
 const reason = ref('');
 const isSubmitting = ref(false);
+const isCancelling = ref(false);
+const errorMessage = ref('');
 
 const getHeaders = () => {
   const token = localStorage.getItem('access_token');
@@ -107,6 +127,21 @@ const submitDeletionRequest = async () => {
     alert(error.response?.data?.message || 'เกิดข้อผิดพลาดในการส่งคำขอ');
   } finally {
     isSubmitting.value = false;
+  }
+};
+
+const cancelDeletionRequest = async () => {
+  const confirmed = window.confirm('ต้องการยกเลิกคำขอปิดร้านที่กำลังรออนุมัติใช่หรือไม่?');
+  if (!confirmed) return;
+
+  isCancelling.value = true;
+  errorMessage.value = '';
+  try {
+    currentRequest.value = await cancelStoreDeletionRequest();
+  } catch (error) {
+    errorMessage.value = error.response?.data?.message || 'ยกเลิกคำขอไม่สำเร็จ';
+  } finally {
+    isCancelling.value = false;
   }
 };
 

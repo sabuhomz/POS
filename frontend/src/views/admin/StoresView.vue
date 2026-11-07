@@ -1,11 +1,12 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import {
   listStores,
   createStore,
   setStoreStatus,
   listDeleteRequests,
-  reviewDeleteRequest
+  reviewDeleteRequest,
+  restoreDeletedStore
 } from '../../services/stores'
 
 const stores = ref([])
@@ -16,6 +17,37 @@ const error = ref('')
 const saving = ref(false)
 const loading = ref(true)
 const reviewing = ref(null)
+const restoring = ref(null)
+let requestRefreshTimer
+const pendingRequests = computed(() => requests.value.filter(request => request.status === 'PENDING'))
+const retainedRequests = computed(() => requests.value.filter(
+  request => request.status === 'APPROVED' && !request.restored_at
+))
+
+function supportsRetention(request) {
+  return Object.hasOwn(request, 'retention_until') && Object.hasOwn(request, 'restored_at')
+}
+
+function formatDate(value) {
+  if (!value) return '-'
+  return new Date(value).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })
+}
+
+function formatRetentionDeadline(value) {
+  if (!value) return '-'
+  const date = new Date(value)
+  const day = new Intl.DateTimeFormat('en-GB', {
+    day: '2-digit', month: '2-digit', year: 'numeric'
+  }).format(date)
+  const time = new Intl.DateTimeFormat('th-TH', {
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+  }).format(date)
+  return `${day} ${time} น.`
+}
+
+function retentionExpired(request) {
+  return !request.retention_until || new Date(request.retention_until).getTime() <= Date.now()
+}
 
 async function load() {
   loading.value = true
@@ -30,16 +62,22 @@ async function load() {
       store => store.status !== 'DELETED'
     )
 
-    // แสดงเฉพาะคำขอที่ยัง PENDING
-    requests.value = (requestList || []).filter(
-      request => (request.status || 'PENDING') === 'PENDING'
-    )
+    requests.value = requestList || []
   } catch (e) {
     error.value =
       e.response?.data?.message ||
       'โหลด Store หรือคำขอลบไม่สำเร็จ'
   } finally {
     loading.value = false
+  }
+}
+
+async function refreshRequests() {
+  if (reviewing.value || restoring.value) return
+  try {
+    requests.value = await listDeleteRequests()
+  } catch {
+    // Keep the current list if a background refresh briefly fails.
   }
 }
 
@@ -85,20 +123,37 @@ async function toggle(store) {
 
 async function review(request, decision) {
   if (reviewing.value) return
+  if (decision === 'APPROVED' && !supportsRetention(request)) {
+    error.value = 'Backend ที่เชื่อมอยู่ยังไม่รองรับการเก็บข้อมูล 3 เดือน จึงปิดการอนุมัติไว้เพื่อป้องกันข้อมูลถูกลบถาวร กรุณาอัปเดต backend และฐานข้อมูลก่อน'
+    return
+  }
 
   reviewing.value = request.id
   error.value = ''
 
   try {
-    await reviewDeleteRequest(
+    const result = await reviewDeleteRequest(
       request.id,
       decision
     )
 
-    // เอาคำขอนี้ออกจากหน้าจอทันที
-    requests.value = requests.value.filter(
-      item => item.id !== request.id
-    )
+    if (decision === 'APPROVED') {
+      if (!result?.retention_until) {
+        throw new Error('Backend ไม่ได้ยืนยันวันหมดอายุการเก็บข้อมูล จึงยังไม่สามารถแสดงรายการเก็บรักษาได้')
+      }
+      requests.value = [
+        ...requests.value.filter(item => item.id !== request.id),
+        {
+          ...request,
+          status: 'APPROVED',
+          decided_at: new Date().toISOString(),
+          retention_until: result.retention_until,
+          restored_at: null
+        }
+      ]
+    } else {
+      requests.value = requests.value.filter(item => item.id !== request.id)
+    }
 
     // โหลดข้อมูลใหม่อีกครั้ง
     await load()
@@ -112,7 +167,32 @@ async function review(request, decision) {
   }
 }
 
-onMounted(load)
+async function restore(request) {
+  if (restoring.value || retentionExpired(request)) return
+
+  const confirmed = window.confirm(`ต้องการกู้คืนร้าน "${request.store_name}" พร้อมบัญชีและข้อมูลเดิมใช่หรือไม่?`)
+  if (!confirmed) return
+
+  restoring.value = request.store_id
+  error.value = ''
+  try {
+    await restoreDeletedStore(request.store_id)
+    await load()
+  } catch (e) {
+    error.value = e.response?.data?.message || 'กู้คืนร้านไม่สำเร็จ'
+  } finally {
+    restoring.value = null
+  }
+}
+
+onMounted(() => {
+  load()
+  requestRefreshTimer = window.setInterval(refreshRequests, 10000)
+})
+
+onBeforeUnmount(() => {
+  window.clearInterval(requestRefreshTimer)
+})
 </script>
 
 <template>
@@ -192,14 +272,22 @@ onMounted(load)
     <section class="rounded-xl bg-white p-5 shadow-sm">
 
       <h2 class="mb-4 text-lg font-semibold">
-        คำขอลบร้านจาก Owner
+        คำขอลบร้านจากเจ้าของร้าน
       </h2>
+      <p class="mb-4 text-sm text-gray-500">
+        เมื่ออนุมัติ ร้านจะถูกปิดและปิดบัญชีผู้ใช้ ข้อมูลทั้งหมดเก็บไว้ 3 เดือน โดยสามารถกู้คืนได้ก่อนหมดกำหนด
+      </p>
+      <p class="mb-4 text-xs text-gray-400">คิวคำขออัปเดตอัตโนมัติทุก 10 วินาที</p>
+      <p v-if="pendingRequests.some(request => !supportsRetention(request))"
+        class="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
+        Backend ที่เชื่อมอยู่ยังไม่รองรับการเก็บข้อมูล 3 เดือน ปุ่มอนุมัติจะถูกปิดไว้จนกว่าจะอัปเดต backend และฐานข้อมูล
+      </p>
 
-      <div v-if="!requests.length" class="text-gray-500">
+      <div v-if="!pendingRequests.length" class="text-gray-500">
         ไม่มีคำขอรออนุมัติ
       </div>
 
-      <div v-for="request in requests" :key="request.id"
+      <div v-for="request in pendingRequests" :key="request.id"
         class="flex flex-col gap-3 border-b py-4 last:border-0 md:flex-row md:items-center md:justify-between">
 
         <div>
@@ -226,12 +314,12 @@ onMounted(load)
 
         <div v-if="(request.status || 'PENDING') === 'PENDING'" class="flex gap-2">
 
-          <button @click="review(request, 'APPROVED')" :disabled="reviewing === request.id"
+          <button @click="review(request, 'APPROVED')" :disabled="reviewing === request.id || !supportsRetention(request)"
             class="rounded bg-red-600 px-3 py-1 text-white disabled:opacity-50">
             {{
               reviewing === request.id
                 ? 'กำลังดำเนินการ...'
-                : 'อนุมัติลบ'
+                : 'อนุมัติลบ (เก็บข้อมูล 3 เดือน)'
             }}
           </button>
 
@@ -244,6 +332,37 @@ onMounted(load)
 
       </div>
 
+    </section>
+
+    <section class="rounded-xl bg-white p-5 shadow-sm">
+      <h2 class="text-lg font-semibold">ร้านที่อนุมัติลบ: เก็บข้อมูลไว้ 3 เดือน</h2>
+      <p class="mb-4 mt-1 text-sm text-gray-500">
+        บัญชีพนักงาน สินค้า ประวัติการขาย และข้อมูลที่เกี่ยวข้องยังเก็บไว้จนถึงเวลาที่ระบุ สามารถกู้คืนร้านได้ก่อนหมดกำหนด
+      </p>
+
+      <div v-if="!retainedRequests.length" class="text-gray-500">
+        ไม่มีร้านที่อยู่ระหว่างเก็บข้อมูล
+      </div>
+
+      <div v-for="request in retainedRequests" :key="`retained-${request.id}`"
+        class="flex flex-col gap-4 border-t py-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <p class="font-medium">{{ request.store_name || `Store #${request.store_id}` }}</p>
+          <p class="text-sm text-gray-500">
+            อนุมัติเมื่อ {{ formatDate(request.decided_at) }} · เก็บข้อมูลถึง {{ formatRetentionDeadline(request.retention_until) }}
+          </p>
+          <p class="text-sm text-gray-500">
+            พนักงาน {{ request.employee_count }} คน · สินค้า {{ request.product_count }} รายการ
+          </p>
+          <p v-if="retentionExpired(request)" class="mt-1 text-sm font-medium text-red-600">
+            หมดระยะเวลาเก็บแล้ว ข้อมูลจะถูกล้างโดยระบบ
+          </p>
+        </div>
+        <button @click="restore(request)" :disabled="restoring === request.store_id || retentionExpired(request)"
+          class="shrink-0 rounded-lg border border-blue-600 px-4 py-2 text-blue-700 disabled:cursor-not-allowed disabled:opacity-50">
+          {{ restoring === request.store_id ? 'กำลังกู้คืน...' : 'กู้คืนร้าน' }}
+        </button>
+      </div>
     </section>
 
   </div>

@@ -12,6 +12,8 @@ import ownerDashboardRoutes from './routes/ownerDashboard.js'
 import employeeRoutes from './routes/employees.js'
 import restockRoutes from './routes/restock.js'
 import promotionRoutes from './routes/promotions.js'
+import shiftRoutes from './routes/shifts.js'
+import { purgeExpiredDeletedStores } from './controllers/storeLifecycleController.js'
 
 import { pool, testDatabaseConnection } from './config/database.js'
 
@@ -150,6 +152,11 @@ app.use(
   promotionRoutes
 )
 
+app.use(
+  '/api/shifts',
+  shiftRoutes
+)
+
 
 /*
 |--------------------------------------------------------------------------
@@ -172,8 +179,8 @@ app.use(
 app.use((err, _req, res, _next) => {
   console.error(err)
 
-  res.status(500).json({
-    message: 'Internal server error'
+  res.status(err.status || 500).json({
+    message: err.status ? err.message : 'Internal server error'
   })
 })
 
@@ -196,3 +203,16 @@ app.listen(
     )
   }
 )
+
+async function cleanExpiredStoreData() {
+  try {
+    const removed = await purgeExpiredDeletedStores()
+    if (removed > 0) console.log(`Purged ${removed} expired deleted store(s)`)
+  } catch {
+    // The cleanup runs again on the next interval; keep the API available.
+  }
+}
+
+cleanExpiredStoreData()
+const retentionCleanup = setInterval(cleanExpiredStoreData, 60 * 60 * 1000)
+retentionCleanup.unref()

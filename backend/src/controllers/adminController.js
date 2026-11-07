@@ -24,6 +24,7 @@ export async function getAdminDashboard(req, res, next) {
         ORDER BY u.id ASC
         LIMIT 1
       ) owner ON TRUE
+      WHERE s.status <> 'DELETED'
       ORDER BY s.id DESC
     `)
 
