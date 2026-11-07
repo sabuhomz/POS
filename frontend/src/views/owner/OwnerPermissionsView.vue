@@ -3,10 +3,16 @@ import { ref, computed, onMounted } from 'vue'
 import api from '../../services/api'
 
 const groups = [
-  { title: 'การขาย', entries: [['sale.create', 'ขายสินค้า / สแกนบาร์โค้ด'], ['sale.view', 'ดูประวัติการขาย']] },
-  { title: 'สินค้าและสต็อก', entries: [['product.view', 'ดูรายการสินค้า'], ['inventory.view', 'ดูคลังสินค้า'], ['inventory.restock.request', 'ส่งคำขอเพิ่มสต็อก'], ['inventory.restock.view', 'ดูคำขอเพิ่มสต็อก']] },
-  { title: 'รายงาน', entries: [['report.view', 'ดูแดชบอร์ด'], ['report.daily', 'รายงานรายวัน'], ['report.trend', 'แนวโน้มยอดขาย'], ['report.top-products', 'สินค้าขายดี'], ['report.weekly', 'รายงานรายสัปดาห์']] },
-  { title: 'อื่น ๆ', entries: [['promotion.view', 'ดูโปรโมชั่น']] }
+  { title: 'หน้าขายสินค้า', entries: [
+    ['product.view', 'ดูรายการสินค้าที่สร้างไว้'],
+    ['sale.create', 'สแกนบาร์โค้ดและขายสินค้า']
+  ] },
+  { title: 'หน้าเพิ่มสต็อก', entries: [
+    ['inventory.restock.request', 'สแกนบาร์โค้ดและส่งคำขอเพิ่มสต็อก']
+  ] },
+  { title: 'หน้าประวัติการขาย', entries: [
+    ['sale.view', 'ดูประวัติการขายและรายละเอียดใบเสร็จ']
+  ] }
 ]
 const employees = ref([])
 const catalog = ref([])
@@ -75,7 +81,7 @@ onMounted(load)
     <div class="heading">
       <div>
         <h1>กำหนดสิทธิ์พนักงาน</h1>
-        <p>เจ้าของร้านเลือกการเข้าถึงของพนักงานภายในร้านตนเองได้</p>
+        <p>เจ้าของร้านกำหนดได้เฉพาะฟังก์ชันที่พนักงานใช้งานในแอป POS PyQt5</p>
       </div>
       <button class="secondary" type="button" :disabled="loading || saving" @click="load">↻ รีเฟรช</button>
     </div>
@@ -124,7 +130,7 @@ onMounted(load)
               {{ saving ? 'กำลังบันทึก...' : 'บันทึกสิทธิ์พนักงาน' }}
             </button>
           </div>
-          <p class="footnote">สิทธิ์ผู้ดูแลระบบและการแก้ไขข้อมูลสำคัญไม่ได้เปิดให้กำหนดจากหน้านี้ เพื่อป้องกันการให้สิทธิ์เกินจำเป็น</p>
+          <p class="footnote">การเริ่ม/จบกะผูกกับบัญชีพนักงานโดยตรง ไม่ใช่สิทธิ์แบบเลือกได้ ส่วนการเพิ่มสต็อกทันทีสงวนไว้ให้เจ้าของร้าน</p>
         </template>
         <p v-else>เลือกพนักงานเพื่อกำหนดสิทธิ์</p>
       </div>
