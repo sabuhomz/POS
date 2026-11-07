@@ -2,7 +2,6 @@
   <div class="p-6 max-w-3xl mx-auto">
     <div class="mb-6">
       <h1 class="text-2xl font-bold text-gray-900">ยื่นคำขอปิดร้านค้า</h1>
-      <p class="mt-1 text-sm text-gray-500">คำขอจะยังไม่ลบร้านจนกว่า Admin จะอนุมัติ</p>
     </div>
 
     <div v-if="errorMessage" class="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700" role="alert">

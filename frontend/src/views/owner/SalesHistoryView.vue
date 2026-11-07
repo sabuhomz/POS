@@ -4,7 +4,7 @@
       <div class="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 class="text-2xl font-bold">ประวัติการขาย</h1>
-          <p class="mt-1 text-sm text-gray-500">ตรวจสอบรายการขาย ใบเสร็จ และรายละเอียดสินค้า</p>
+          
         </div>
         <button type="button" class="rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50 disabled:opacity-50" :disabled="loading" @click="loadSales">
           {{ loading ? 'กำลังโหลด...' : 'รีเฟรช' }}
@@ -16,7 +16,7 @@
       <div class="flex flex-wrap items-end justify-between gap-4 border-b bg-blue-50/70 p-6">
         <div>
           <h2 class="text-lg font-bold">ยอดขายแยกตามกะพนักงาน</h2>
-          <p class="mt-1 text-sm text-gray-600">ตรวจสอบเวลาเริ่ม-จบกะ จำนวนบิล และยอดขายของพนักงานแต่ละคน</p>
+          
         </div>
         <div class="flex flex-wrap items-end gap-3">
           <label class="text-sm text-gray-700">ตั้งแต่
@@ -67,7 +67,6 @@
           </tbody>
         </table>
       </div>
-      <p class="border-t px-5 py-3 text-xs text-gray-500">ยอดขายคำนวณจากรายการที่ผูกกับบัญชีพนักงานและเกิดขึ้นระหว่างเวลาเริ่มกะถึงจบกะ</p>
     </section>
 
     <div class="rounded-xl bg-white p-6 shadow">
@@ -152,7 +151,7 @@
         <div class="flex items-center justify-between">
           <div>
             <h2 class="text-xl font-bold">รายละเอียดการขาย</h2>
-            <p class="text-sm text-gray-500">{{ selectedSale.receiptNumber }}</p>
+            <p class="text-sm text-gray-500">{{ selectedSale.receiptNumber }}</p> <p class="text-sm text-gray-500">{{ formatDate(selectedSale.createdAt) }}</p> <p class="text-sm text-gray-500">ผู้ขาย: {{ selectedSale.employeeUsername }}</p>
           </div>
           <button type="button" class="text-2xl text-gray-500" @click="selectedSale = null">×</button>
         </div>

@@ -81,7 +81,6 @@ onMounted(load)
     <div class="heading">
       <div>
         <h1>กำหนดสิทธิ์พนักงาน</h1>
-        <p>กำหนดการใช้งานเฉพาะ 3 หน้าของแอป POS สำหรับพนักงาน</p>
       </div>
       <button class="secondary" type="button" :disabled="loading || saving" @click="load">↻ รีเฟรช</button>
     </div>
@@ -108,7 +107,6 @@ onMounted(load)
           <div class="panel-heading">
             <div>
               <h2>สิทธิ์ของ {{ selected.username }}</h2>
-              <p>เลือกเฉพาะสิทธิ์ที่ต้องการให้พนักงานใช้ในแอป POS</p>
             </div>
             <span class="counter">เลือก {{ selectedPermissions.length }} สิทธิ์</span>
           </div>
@@ -130,7 +128,6 @@ onMounted(load)
               {{ saving ? 'กำลังบันทึก...' : 'บันทึกสิทธิ์พนักงาน' }}
             </button>
           </div>
-          <p class="footnote">ระบบจะให้สิทธิ์อ่านข้อมูลสินค้าพื้นฐานที่แอปต้องใช้โดยอัตโนมัติเมื่อบันทึก โดยไม่เปิดสิทธิ์จัดการเว็บไซต์ การเริ่ม/จบกะใช้ได้สำหรับบัญชีพนักงาน พนักงานที่ได้รับสิทธิ์เพิ่มสต็อกทันทีสามารถบันทึกสินค้าเข้าคลังโดยไม่ต้องรออนุมัติ</p>
         </template>
         <p v-else>เลือกพนักงานเพื่อกำหนดสิทธิ์</p>
       </div>

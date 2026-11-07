@@ -1,0 +1,103 @@
+# POS Backend
+
+Node.js + Express + PostgreSQL backend สำหรับระบบ POS จริง
+
+## Account flow
+
+1. รัน `database/schema.sql` และ `database/promotion.sql` ใน PostgreSQL
+2. ตั้งค่า `.env`
+3. สร้าง Admin คนแรกด้วย `npm run create-admin -- admin01 YourPassword123`
+4. Admin login ผ่าน `/api/auth/login`
+5. Admin ใช้ `/api/admin/users` สร้าง ADMIN หรือ OWNER
+6. OWNER ต้องถูกผูกกับ Store ที่ ACTIVE
+7. Password เก็บเป็น bcrypt hash
+8. JWT มี role/storeId/permissions และ Backend ตรวจซ้ำทุก request
+
+## Local PostgreSQL
+
+```env
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DB_NAME=pos_database
+DB_USER=postgres
+DB_PASSWORD=YOUR_PASSWORD
+DB_SSL=false
+```
+
+เตรียมหรืออัปเดตฐานข้อมูลด้วยสคริปต์ทั้งสองไฟล์จากโฟลเดอร์ `backend`:
+
+```bash
+psql -h 127.0.0.1 -U postgres -d YOUR_DATABASE -v ON_ERROR_STOP=1 -f database/schema.sql
+psql -h 127.0.0.1 -U postgres -d YOUR_DATABASE -v ON_ERROR_STOP=1 -f database/promotion.sql
+```
+
+## Run
+
+```bash
+npm install
+npm run create-admin -- admin01 YourPassword123
+npm run dev
+```
+
+Default API: `http://localhost:5000/api`
+
+## Employee shifts and sales per shift
+
+- `GET /api/shifts/current` (EMPLOYEE): returns the employee's currently open shift, if any.
+- `POST /api/shifts/start` (EMPLOYEE): opens a shift; only one open shift per employee is allowed.
+- `POST /api/shifts/end` (EMPLOYEE): closes the employee's open shift.
+- `GET /api/owner/shifts?from=YYYY-MM-DD&to=YYYY-MM-DD` (OWNER with `sale.view`): lists shifts with receipt count and sales total.
+- The POS checkout must save each sale's `employee_id` and `created_at`. The report attributes sales made between the shift's start and end timestamps to that employee and shift.
+
+For existing databases, rerun `database/schema.sql` to create `employee_shifts` and its indexes.
+
+## Google Cloud SQL
+
+สามารถเปลี่ยน connection ผ่าน `DATABASE_URL` หรือ DB_* environment variables ได้โดยไม่ต้องเปลี่ยน business logic
+
+## Store deletion retention
+
+- เมื่อ Admin อนุมัติคำขอลบร้าน ระบบจะเปลี่ยนสถานะร้านเป็น `DELETED` และปิดบัญชีที่ใช้งานอยู่ของร้าน
+- ข้อมูลร้าน บัญชีพนักงาน สินค้า โปรโมชั่น การขาย และคำขอที่เกี่ยวข้องจะยังอยู่ในฐานข้อมูล 3 เดือน โดย API ส่งวันและเวลาที่กำหนดล้างข้อมูลกลับให้หน้า Admin
+- Admin กู้คืนร้านและบัญชีที่เคยเปิดใช้งานได้ผ่าน `POST /api/admin/stores/:id/restore` ก่อนครบกำหนด
+- เจ้าของร้านยกเลิกคำขอที่ยัง `PENDING` ได้ผ่าน `PATCH /api/stores/delete-requests/me/cancel`; คำขอจะถูกซ่อนจากคิว Admin แต่เก็บสถานะ `CANCELLED` ไว้เป็นประวัติ
+- Backend ล้างข้อมูลและรูปสินค้าถาวรหลังครบกำหนด โดยตรวจทุกชั่วโมง
+- สำหรับฐานข้อมูลเดิม ให้รัน schema ที่เพิ่ม migration แบบ `ADD COLUMN IF NOT EXISTS`:
+
+  ```bash
+  psql -h 127.0.0.1 -U postgres -d YOUR_DATABASE -v ON_ERROR_STOP=1 -f database/schema.sql
+  ```
+# Backend Store Lifecycle Changes
+
+เพิ่ม API สำหรับวงจรร้านค้า โดยใช้ Node.js + Express + PostgreSQL จริง
+
+## APIs
+
+### Admin
+- `PATCH /api/admin/stores/:id/status` body `{ "status": "SUSPENDED" }` หรือ `{ "status": "ACTIVE" }`
+- `GET /api/admin/store-delete-requests`
+- `PATCH /api/admin/store-delete-requests/:id` body `{ "decision": "APPROVED" }` หรือ `{ "decision": "REJECTED" }`
+
+### Owner
+- `POST /api/stores/delete-requests` body `{ "reason": "..." }`
+- `GET /api/stores/delete-requests/me`
+- `PATCH /api/stores/delete-requests/me/cancel` ยกเลิกคำขอที่ยังรออนุมัติ
+
+ทุก endpoint ต้องส่ง `Authorization: Bearer <JWT>`
+
+## Database migration
+
+รันส่วนเพิ่มเติมใน `database/schema.sql` เพื่อสร้างตาราง `store_deletion_requests`:
+
+```bash
+psql "$DATABASE_URL" -f database/schema.sql
+```
+
+หรือรัน SQL ส่วน `CREATE TABLE store_deletion_requests ...` ใน Cloud SQL
+
+## พฤติกรรม
+
+- Admin ระงับร้านได้ด้วย `SUSPENDED`; Owner จะ login ไม่ได้ เพราะ auth ตรวจสถานะร้าน
+- Owner ส่งคำขอลบได้ครั้งละหนึ่งคำขอที่ยังเป็น `PENDING`
+- Admin ต้องอนุมัติจึงเปลี่ยนร้านเป็น `DELETED` และปิดใช้งาน Owner ของร้านนั้น
+- การอนุมัติ/ลบทำใน transaction เดียวกัน

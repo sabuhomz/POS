@@ -4,9 +4,7 @@
     <div class="page-header">
       <div>
         <h2>จัดการบัญชีพนักงาน</h2>
-        <p class="subtitle">
-          บัญชีสำหรับใช้งานระบบ POS
-        </p>
+
       </div>
 
       <button
