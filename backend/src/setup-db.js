@@ -5,7 +5,7 @@ let client
 try {
   client = await pool.connect()
   await client.query('BEGIN')
-  for (const name of ['schema.sql', 'promotion.sql']) {
+  for (const name of ['schema.sql', 'promotion.sql', 'migrations/20261108_receipt_corrections.sql']) {
     const sql = await readFile(new URL(`../database/${name}`, import.meta.url), 'utf8')
     // Both schema files run atomically; schema.sql also supports standalone psql.
     await client.query(sql.replace(/^BEGIN;\s*$/gm, '').replace(/^COMMIT;\s*$/gm, ''))
