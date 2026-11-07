@@ -10,8 +10,14 @@ export function buildDatabaseConfig(env) {
   }
   if (env.DATABASE_URL) return { ...common, connectionString: env.DATABASE_URL }
 
-  const password = env.DB_PASSWORD ?? env.PGPASSWORD
-  if (typeof password !== 'string' || password.length === 0) {
+  const passwordless = env.DB_PASSWORDLESS === 'true'
+  const host = env.DB_HOST || '127.0.0.1'
+  if (passwordless && !['127.0.0.1', '::1'].includes(host)) {
+    throw new Error('DB_PASSWORDLESS requires DB_HOST=127.0.0.1 or ::1')
+  }
+  // The server must use a matching localhost trust rule in pg_hba.conf.
+  const password = passwordless ? '' : (env.DB_PASSWORD ?? env.PGPASSWORD)
+  if (!passwordless && (typeof password !== 'string' || password.length === 0)) {
     const error = new Error('กรุณาตั้งค่า DB_PASSWORD ใน backend/.env เป็นรหัสผ่าน PostgreSQL ของ DB_USER แล้วรีสตาร์ต Backend')
     error.code = 'DB_CONFIG_MISSING_PASSWORD'
     error.status = 503
@@ -19,7 +25,7 @@ export function buildDatabaseConfig(env) {
   }
   return {
     ...common,
-    host: env.DB_HOST || '127.0.0.1',
+    host,
     port: Number(env.DB_PORT || 5432),
     database: env.DB_NAME || 'pos_database',
     user: env.DB_USER || 'postgres',

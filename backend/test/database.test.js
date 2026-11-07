@@ -47,3 +47,11 @@ test('unexpected application errors remain 500 and explicit client errors keep s
     assert.equal(body.message, 'Invalid input')
   } finally { console.error = original }
 })
+
+test('explicit localhost trust mode supports no password', () => {
+  assert.equal(buildDatabaseConfig({ DB_PASSWORDLESS: 'true' }).password, '')
+  assert.equal(buildDatabaseConfig({ DB_PASSWORDLESS: 'true', DB_HOST: '::1' }).host, '::1')
+})
+test('passwordless mode rejects remote hosts', () => {
+  assert.throws(() => buildDatabaseConfig({ DB_PASSWORDLESS: 'true', DB_HOST: '192.168.1.10' }), /DB_HOST/)
+})
