@@ -204,9 +204,7 @@ onBeforeUnmount(() => {
         จัดการ Store
       </h1>
 
-      <p class="text-sm text-gray-500">
-        Admin สร้างร้าน ระงับร้าน และอนุมัติคำขอลบร้าน
-      </p>
+     
     </div>
 
     <!-- Error -->
@@ -274,9 +272,7 @@ onBeforeUnmount(() => {
       <h2 class="mb-4 text-lg font-semibold">
         คำขอลบร้านจากเจ้าของร้าน
       </h2>
-      <p class="mb-4 text-sm text-gray-500">
-        เมื่ออนุมัติ ร้านจะถูกปิดและปิดบัญชีผู้ใช้ ข้อมูลทั้งหมดเก็บไว้ 3 เดือน โดยสามารถกู้คืนได้ก่อนหมดกำหนด
-      </p>
+      
       <p class="mb-4 text-xs text-gray-400">คิวคำขออัปเดตอัตโนมัติทุก 10 วินาที</p>
       <p v-if="pendingRequests.some(request => !supportsRetention(request))"
         class="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
@@ -336,9 +332,7 @@ onBeforeUnmount(() => {
 
     <section class="rounded-xl bg-white p-5 shadow-sm">
       <h2 class="text-lg font-semibold">ร้านที่อนุมัติลบ: เก็บข้อมูลไว้ 3 เดือน</h2>
-      <p class="mb-4 mt-1 text-sm text-gray-500">
-        บัญชีพนักงาน สินค้า ประวัติการขาย และข้อมูลที่เกี่ยวข้องยังเก็บไว้จนถึงเวลาที่ระบุ สามารถกู้คืนร้านได้ก่อนหมดกำหนด
-      </p>
+      
 
       <div v-if="!retainedRequests.length" class="text-gray-500">
         ไม่มีร้านที่อยู่ระหว่างเก็บข้อมูล

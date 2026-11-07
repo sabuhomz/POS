@@ -48,9 +48,6 @@ onMounted(loadDashboard)
         Admin Dashboard
       </h1>
 
-      <p class="mt-1 text-sm text-gray-500">
-        ภาพรวมการจัดการร้านค้า
-      </p>
     </div>
 
     <!-- Error -->
@@ -96,10 +93,6 @@ onMounted(loadDashboard)
         <h2 class="text-lg font-semibold text-gray-900">
           ร้านค้าทั้งหมด
         </h2>
-
-        <p class="mt-1 text-sm text-gray-500">
-          รายชื่อร้านและเจ้าของร้านในระบบ
-        </p>
       </div>
 
       <div
