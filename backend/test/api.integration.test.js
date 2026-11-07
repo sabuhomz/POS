@@ -40,6 +40,7 @@ async function setup() {
   for (const name of ['schema.sql', 'promotion.sql']) {
     await db.exec(await readFile(new URL(`../database/${name}`, import.meta.url), 'utf8'))
   }
+  await db.exec(await readFile(new URL('../database/migrations/20261108_receipt_corrections.sql', import.meta.url), 'utf8'))
 }
 
 await test('full API flow, invalid inputs, store isolation, and database failures', async t => {
@@ -115,8 +116,34 @@ await test('full API flow, invalid inputs, store isolation, and database failure
     await request('POST', '/shifts/start', {}, employee, 201)
     await request('GET', '/shifts/current', undefined, employee)
     await request('GET', '/sales/barcode/BC-001', undefined, employee)
-    await request('POST', '/sales', { barcodes: ['BC-001'], paymentMethod: 'QR', paymentConfirmed: true }, employee, 201)
-    await request('POST', '/sales', { barcodes: ['BC-001'], paymentMethod: 'QR', paymentConfirmed: true }, employee, 409)
+    const quote = await request('POST', '/sales/quote', { barcodes: ['BC-001'] }, employee)
+    assert.equal(quote.subtotal, '25.00')
+    assert.equal(quote.discount, '5.00')
+    assert.equal(quote.total, '20.00')
+    const sold = await request('POST', '/sales', {
+      barcodes: ['BC-001'], paymentMethod: 'QR',
+      paymentConfirmed: true, expectedTotal: quote.total
+    }, employee, 201)
+    await request('POST', '/sales', {
+      barcodes: ['BC-001'], paymentMethod: 'QR',
+      paymentConfirmed: true, expectedTotal: quote.total
+    }, employee, 409)
+    assert.equal((await query('SELECT COUNT(*)::int AS count FROM sale_unit_links WHERE sale_id=$1',[sold.saleId])).rows[0].count,1)
+    await request('POST', `/receipts/${sold.saleId}/corrections`, {
+      action: 'VOID', reason: 'บันทึกยอดผิด ต้องยกเลิก'
+    }, employee, 403)
+    await query("INSERT INTO user_permissions(user_id,permission_key) VALUES($1,'sale.correction.request') ON CONFLICT DO NOTHING",[employeeId])
+    const pending = await request('POST', `/receipts/${sold.saleId}/corrections`, {
+      action: 'VOID', reason: 'บันทึกยอดผิด ต้องยกเลิก'
+    }, employee, 201)
+    assert.equal(pending.status,'PENDING')
+    const requests = await request('GET', '/receipts/owner/requests', undefined, owner)
+    const approval = requests.requests.find(item => item.sale_id === sold.saleId && item.status === 'PENDING')
+    assert.ok(approval)
+    await request('PATCH', `/receipts/owner/requests/${approval.id}/approve`, {}, owner)
+    const voided = (await query('SELECT correction_status FROM sales WHERE id=$1',[sold.saleId])).rows[0]
+    assert.equal(voided.correction_status,'VOID')
+    assert.equal((await query("SELECT status FROM product_items WHERE barcode='BC-001'")).rows[0].status,'IN_STOCK')
     await request('POST', '/shifts/end', {}, employee)
     await request('GET', '/owner/sales-history', undefined, owner)
     await request('GET', '/owner/shifts', undefined, owner)
