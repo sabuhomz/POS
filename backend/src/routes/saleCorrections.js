@@ -49,7 +49,8 @@ async function applyRequest(client, change, actorId) {
       throw failure('สถานะสินค้าถูกเปลี่ยนแล้ว ไม่สามารถยกเลิกบิลได้', 409)
     }
     const productIds = [...new Set(links.rows.map(row => Number(row.product_id)))].sort((a,b) => a-b)
-    await client.query('SELECT id FROM products WHERE id=ANY($1::bigint[]) AND store_id=$2 ORDER BY id FOR UPDATE', [productIds, change.store_id])
+    const matchingProducts = await client.query('SELECT id FROM products WHERE id=ANY($1::bigint[]) AND store_id=$2 ORDER BY id FOR UPDATE', [productIds, change.store_id])
+    if (matchingProducts.rowCount !== productIds.length) throw failure('ข้อมูลสินค้าเปลี่ยนไปแล้ว ไม่สามารถคืนสต็อกอัตโนมัติ', 409)
     const ids = links.rows.map(row => row.product_item_id)
     const restored = await client.query(`UPDATE product_items SET status='IN_STOCK', updated_at=NOW()
       WHERE id=ANY($1::bigint[]) AND store_id=$2 AND status='SOLD' RETURNING id`, [ids, change.store_id])
@@ -69,6 +70,7 @@ async function applyRequest(client, change, actorId) {
     const rows = await client.query('SELECT id, quantity, unit_price FROM sale_items WHERE sale_id=$1 ORDER BY id FOR UPDATE', [sale.id])
     const gross = rows.rows.map(r => BigInt(Math.round(Number(r.unit_price) * 100)) * BigInt(r.quantity))
     const lineGross = gross.reduce((sum, v) => sum + v, 0n)
+    if (!rows.rowCount || lineGross !== subtotalCents) throw failure('ยอดรายการสินค้าเดิมไม่ตรงกับใบเสร็จ ต้องตรวจสอบก่อนแก้ยอด', 409)
     let allocated = 0n
     for (let i=0;i<rows.rowCount;i++) {
       const share = i===rows.rowCount-1 ? discountCents - allocated : (lineGross ? discountCents * gross[i] / lineGross : 0n)
