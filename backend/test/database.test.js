@@ -41,7 +41,8 @@ test('unexpected application errors remain 500 and explicit client errors keep s
     const res = { status(value) { status = value; return this }, json(value) { body = value } }
     errorHandler(new Error('private internals'), {}, res, () => {})
     assert.equal(status, 500)
-    assert.equal(body.message, 'Internal server error')
+    assert.equal(body.code, 'UNEXPECTED_ERROR')
+    assert.ok(!body.message.includes('private internals'))
     errorHandler(Object.assign(new Error('Invalid input'), { status: 400 }), {}, res, () => {})
     assert.equal(status, 400)
     assert.equal(body.message, 'Invalid input')
@@ -55,3 +56,4 @@ test('explicit localhost trust mode supports no password', () => {
 test('passwordless mode rejects remote hosts', () => {
   assert.throws(() => buildDatabaseConfig({ DB_PASSWORDLESS: 'true', DB_HOST: '192.168.1.10' }), /DB_HOST/)
 })
+

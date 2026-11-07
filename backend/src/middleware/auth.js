@@ -6,6 +6,11 @@ export async function authenticate(req, res, next) {
   const token = header.startsWith('Bearer ') ? header.slice(7) : null
   if (!token) return res.status(401).json({ message: 'Authentication required' })
   try {
+    if (!process.env.JWT_SECRET) {
+      const error = new Error('Missing JWT_SECRET')
+      error.code = 'AUTH_CONFIG_INVALID'
+      return next(error)
+    }
     req.user = jwt.verify(token, process.env.JWT_SECRET)
     const account = await query(
       'SELECT is_active,role,store_id FROM users WHERE id=$1',
@@ -25,8 +30,9 @@ export async function authenticate(req, res, next) {
       }
     }
     next()
-  } catch {
-    if (req.user) return next(new Error('Authentication database check failed'))
+  } catch (error) {
+    if (req.user) return next(error)
     res.status(401).json({ message: 'Invalid or expired token' })
   }
 }
+

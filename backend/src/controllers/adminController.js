@@ -48,6 +48,7 @@ export async function listStores(req, res, next) {
 export async function createStore(req, res, next) {
   try {
     const name = String(req.body.name || '').trim()
+    if (name.length > 150) return res.status(400).json({ message: 'ชื่อร้านต้องไม่เกิน 150 ตัวอักษร' })
     if (!name) return res.status(400).json({ message: 'Store name is required' })
     const result = await query('INSERT INTO stores(name) VALUES($1) RETURNING id, name, status, created_at', [name])
     res.status(201).json({ store: result.rows[0] })
@@ -76,7 +77,8 @@ export async function createUser(req, res, next) {
       return res.status(400).json({ message: 'username, password and role (ADMIN/OWNER) are required' })
     }
     if (password.length < 8) return res.status(400).json({ message: 'Password must be at least 8 characters' })
-    if (role === 'OWNER' && !storeId) return res.status(400).json({ message: 'storeId is required for OWNER' })
+    if (username.length > 100) return res.status(400).json({ message: 'Username ต้องไม่เกิน 100 ตัวอักษร' })
+    if (role === 'OWNER' && (!Number.isSafeInteger(storeId) || storeId < 1)) return res.status(400).json({ message: 'storeId is required for OWNER' })
 
     const hash = await bcrypt.hash(password, 12)
     const user = await createManagedAccount(pool, {
@@ -93,11 +95,13 @@ export async function createUser(req, res, next) {
 export async function updateUserStatus(req, res, next) {
   try {
     const id = Number(req.params.id)
-    const isActive = Boolean(req.body.isActive)
+    if (typeof req.body.isActive !== 'boolean') return res.status(400).json({ message: 'isActive ต้องเป็น true หรือ false' })
+    const isActive = req.body.isActive
     if (id === Number(req.user.sub) && !isActive) return res.status(400).json({ message: 'You cannot deactivate your own account' })
     const result = await query('UPDATE users SET is_active=$1, updated_at=NOW() WHERE id=$2 AND role IN (\'ADMIN\',\'OWNER\') RETURNING id,username,role,store_id,is_active', [isActive,id])
     if (!result.rowCount) return res.status(404).json({ message: 'User not found' })
     res.json({ user: result.rows[0] })
   } catch (e) { next(e) }
 }
+
 

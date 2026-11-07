@@ -1,3 +1,4 @@
+import { validateDateRange } from '../middleware/validateRequest.js'
 import { query } from '../config/database.js'
 
 export async function getCurrentShift(req, res, next) {
@@ -54,6 +55,7 @@ export async function listStoreShifts(req, res, next) {
     if (!Number.isInteger(storeId) || storeId <= 0) return res.status(400).json({ message: 'ไม่พบร้านค้า' })
     const from = String(req.query.from || '').trim()
     const to = String(req.query.to || '').trim()
+    validateDateRange(from, to)
     const where = ['sh.store_id=$1']
     const params = [storeId]
     let index = 2
@@ -94,3 +96,4 @@ export async function listStoreShifts(req, res, next) {
     })) })
   } catch (error) { next(error) }
 }
+

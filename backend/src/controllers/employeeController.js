@@ -172,7 +172,8 @@ export async function updateEmployee(req, res, next) {
 export async function updateEmployeeStatus(req, res, next) {
   try {
     const employeeId = Number(req.params.id)
-    const isActive = Boolean(req.body.is_active)
+    if (typeof req.body.is_active !== 'boolean') return res.status(400).json({ message: 'is_active ต้องเป็น true หรือ false' })
+    const isActive = req.body.is_active
 
     if (!Number.isInteger(employeeId)) {
       return res.status(400).json({
@@ -239,7 +240,7 @@ export async function deleteEmployee(req, res, next) {
     }
 
     const result = await query(
-      'DELETE FROM users WHERE id = $1 AND store_id = $2 RETURNING id',
+      'DELETE FROM users WHERE id = $1 AND store_id = $2 AND role = \'EMPLOYEE\' RETURNING id',
       [employeeId, storeId]
     );
 

@@ -53,8 +53,38 @@ CREATE TABLE IF NOT EXISTS promotions (
 );
 
 -- Upgrade older databases that stored only discount_type/discount_value.
+-- Convert the old type only once, before adding the new column.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='promotions' AND column_name='promotion_type') THEN
+    ALTER TABLE promotions ADD COLUMN promotion_type VARCHAR(40) NOT NULL DEFAULT 'FIXED_DISCOUNT';
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='promotions' AND column_name='discount_type') THEN
+      EXECUTE $q$UPDATE promotions SET promotion_type=CASE WHEN discount_type='PERCENT' THEN 'PERCENT_DISCOUNT' ELSE 'FIXED_DISCOUNT' END$q$;
+    END IF;
+  END IF;
+END $$;
+
 ALTER TABLE promotions ADD COLUMN IF NOT EXISTS promotion_type VARCHAR(40) NOT NULL DEFAULT 'FIXED_DISCOUNT';
 ALTER TABLE promotions ADD COLUMN IF NOT EXISTS description TEXT;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='promotions' AND column_name='start_at') THEN
+    ALTER TABLE promotions ADD COLUMN start_at TIMESTAMPTZ;
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='promotions' AND column_name='starts_at') THEN
+      EXECUTE $q$UPDATE promotions SET start_at=starts_at$q$;
+    END IF;
+    UPDATE promotions SET start_at=NOW() WHERE start_at IS NULL;
+    ALTER TABLE promotions ALTER COLUMN start_at SET DEFAULT NOW();
+    ALTER TABLE promotions ALTER COLUMN start_at SET NOT NULL;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='promotions' AND column_name='end_at') THEN
+    ALTER TABLE promotions ADD COLUMN end_at TIMESTAMPTZ;
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='promotions' AND column_name='ends_at') THEN
+      EXECUTE $q$UPDATE promotions SET end_at=ends_at$q$;
+    END IF;
+  END IF;
+END $$;
+
 ALTER TABLE promotions ADD COLUMN IF NOT EXISTS start_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
 ALTER TABLE promotions ADD COLUMN IF NOT EXISTS end_at TIMESTAMPTZ;
 ALTER TABLE promotions ADD COLUMN IF NOT EXISTS priority INTEGER NOT NULL DEFAULT 0;
@@ -65,17 +95,10 @@ ALTER TABLE promotions ALTER COLUMN name TYPE VARCHAR(200);
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='promotions' AND column_name='discount_type') THEN
-    EXECUTE $q$UPDATE promotions SET promotion_type=CASE WHEN discount_type='PERCENT' THEN 'PERCENT_DISCOUNT' ELSE 'FIXED_DISCOUNT' END$q$;
     EXECUTE $q$ALTER TABLE promotions ALTER COLUMN discount_type SET DEFAULT 'FIXED'$q$;
   END IF;
   IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='promotions' AND column_name='discount_value') THEN
     EXECUTE $q$ALTER TABLE promotions ALTER COLUMN discount_value SET DEFAULT 0$q$;
-  END IF;
-  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='promotions' AND column_name='starts_at') THEN
-    EXECUTE $q$UPDATE promotions SET start_at=COALESCE(starts_at,start_at)$q$;
-  END IF;
-  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='promotions' AND column_name='ends_at') THEN
-    EXECUTE $q$UPDATE promotions SET end_at=COALESCE(ends_at,end_at)$q$;
   END IF;
 END $$;
 
@@ -199,3 +222,4 @@ CREATE TRIGGER trg_promotion_rules_updated_at
 BEFORE UPDATE ON promotion_rules
 FOR EACH ROW
 EXECUTE FUNCTION update_promotion_updated_at();
+

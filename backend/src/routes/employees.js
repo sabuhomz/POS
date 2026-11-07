@@ -1,3 +1,4 @@
+import { validateId } from '../middleware/validateRequest.js'
 import { Router } from 'express'
 
 import { authenticate } from '../middleware/auth.js'
@@ -12,6 +13,7 @@ import {
 } from '../controllers/employeeController.js'
 
 const router = Router()
+router.param('id', validateId)
 
 router.use(authenticate)
 
@@ -43,3 +45,4 @@ router.delete('/:id',
   requireRole('OWNER', 'ADMIN'),
   deleteEmployee)
 export default router
+

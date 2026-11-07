@@ -1,6 +1,7 @@
 import { pool, query } from '../config/database.js'
 import { unlink } from 'node:fs/promises'
 import path from 'node:path'
+import { uploadsDirectory } from '../config/paths.js'
 
 export async function updateStoreStatus(req, res, next) {
   try {
@@ -59,9 +60,7 @@ export async function requestStoreDeletion(req, res, next) {
       return res.status(201).json({ request: insertResult.rows[0] })
     }
   } catch (e) { 
-    console.error("🔥 Error in requestStoreDeletion:", e);
-    // บังคับส่ง Error จากฐานข้อมูลกลับไปแสดงที่หน้าเว็บ
-    return res.status(500).json({ message: `Backend Error: ${e.message}` });
+    next(e)
   }
 }
 
@@ -95,10 +94,10 @@ export async function cancelStoreDeletionRequest(req, res, next) {
 }
 
 // Admin approve/reject store deletion request
-export async function reviewDeleteRequest(req, res) {
-  const client = await pool.connect()
-
+export async function reviewDeleteRequest(req, res, next) {
+  let client
   try {
+    client = await pool.connect()
     const { id } = req.params
     const { decision } = req.body
 
@@ -129,7 +128,7 @@ export async function reviewDeleteRequest(req, res) {
     )
 
     if (requestResult.rows.length === 0) {
-      await client.query('ROLLBACK')
+      await client?.query('ROLLBACK').catch(() => {})
 
       return res.status(404).json({
         message: 'ไม่พบคำขอลบร้าน'
@@ -139,7 +138,7 @@ export async function reviewDeleteRequest(req, res) {
     const request = requestResult.rows[0]
 
     if (request.request_status !== 'PENDING') {
-      await client.query('ROLLBACK')
+      await client?.query('ROLLBACK').catch(() => {})
 
       return res.status(400).json({
         message: 'คำขอนี้ถูกดำเนินการไปแล้ว'
@@ -217,22 +216,18 @@ export async function reviewDeleteRequest(req, res) {
     })
 
   } catch (error) {
-    await client.query('ROLLBACK')
+    await client?.query('ROLLBACK').catch(() => {})
 
-    console.error('reviewDeleteRequest error:', error)
-
-    return res.status(500).json({
-      message: 'ลบร้านไม่สำเร็จ',
-      error: error.message
-    })
+    next(error)
   } finally {
-    client.release()
+    client?.release()
   }
 }
 
 export async function purgeExpiredDeletedStores() {
-  const client = await pool.connect()
+  let client
   try {
+    client = await pool.connect()
     await client.query('BEGIN')
     const expired = await client.query(
       `SELECT id FROM stores
@@ -266,7 +261,6 @@ export async function purgeExpiredDeletedStores() {
     await client.query('DELETE FROM stores WHERE id=ANY($1::bigint[])', [ids])
     await client.query('COMMIT')
 
-    const uploadsDirectory = path.resolve('uploads')
     for (const { image_url: imageUrl } of productImages.rows) {
       const filename = imageUrl.slice('/uploads/'.length)
       if (!filename || filename !== path.basename(filename)) continue
@@ -281,18 +275,18 @@ export async function purgeExpiredDeletedStores() {
 
     return ids.length
   } catch (error) {
-    await client.query('ROLLBACK')
+    await client?.query('ROLLBACK').catch(() => {})
     console.error('purgeExpiredDeletedStores error:', error)
     throw error
   } finally {
-    client.release()
+    client?.release()
   }
 }
 
-export async function restoreDeletedStore(req, res) {
-  const client = await pool.connect()
-
+export async function restoreDeletedStore(req, res, next) {
+  let client
   try {
+    client = await pool.connect()
     await client.query('BEGIN')
     const result = await client.query(
       `SELECT r.id AS request_id,r.account_states,s.id AS store_id,s.name,s.retention_until,s.status
@@ -305,7 +299,7 @@ export async function restoreDeletedStore(req, res) {
     )
 
     if (!result.rowCount) {
-      await client.query('ROLLBACK')
+      await client?.query('ROLLBACK').catch(() => {})
       return res.status(404).json({ message: 'ไม่พบร้านที่กู้คืนได้ หรือหมดระยะเวลาเก็บข้อมูลแล้ว' })
     }
 
@@ -328,10 +322,10 @@ export async function restoreDeletedStore(req, res) {
     await client.query('COMMIT')
     return res.json({ message: 'กู้คืนร้านสำเร็จ', store: { id: store.store_id, name: store.name } })
   } catch (error) {
-    await client.query('ROLLBACK')
-    console.error('restoreDeletedStore error:', error)
-    return res.status(500).json({ message: 'กู้คืนร้านไม่สำเร็จ' })
+    await client?.query('ROLLBACK').catch(() => {})
+    next(error)
   } finally {
-    client.release()
+    client?.release()
   }
 }
+

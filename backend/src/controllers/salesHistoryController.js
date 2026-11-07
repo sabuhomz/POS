@@ -1,3 +1,4 @@
+import { validateDateRange } from '../middleware/validateRequest.js'
 import { pool } from '../config/database.js'
 
 export async function getSalesHistory(req, res, next) {
@@ -11,10 +12,12 @@ export async function getSalesHistory(req, res, next) {
     const page = Math.max(Number.parseInt(req.query.page, 10) || 1, 1)
     const limit = Math.min(Math.max(Number.parseInt(req.query.limit, 10) || 20, 1), 100)
     const offset = (page - 1) * limit
+    if (!Number.isSafeInteger(page) || !Number.isSafeInteger(offset)) return res.status(400).json({ message: 'หมายเลขหน้าไม่ถูกต้อง' })
     const search = String(req.query.search || '').trim()
     const paymentMethod = String(req.query.paymentMethod || '').trim()
     const from = String(req.query.from || '').trim()
     const to = String(req.query.to || '').trim()
+    validateDateRange(from, to)
 
     const where = ['s.store_id = $1']
     const params = [storeId]
@@ -127,3 +130,4 @@ export async function getSalesHistory(req, res, next) {
     next(error)
   }
 }
+

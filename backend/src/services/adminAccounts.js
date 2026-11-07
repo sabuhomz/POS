@@ -27,9 +27,10 @@ export async function createManagedAccount(pool, { username, passwordHash, role,
     await client.query('COMMIT')
     return user
   } catch (error) {
-    await client.query('ROLLBACK')
+    await client.query('ROLLBACK').catch(() => {})
     throw error
   } finally {
     client.release()
   }
 }
+

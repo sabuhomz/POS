@@ -1,5 +1,7 @@
 import express from 'express'
-import path from 'path'
+import { pathToFileURL } from 'node:url'
+import { uploadsDirectory } from './config/paths.js'
+import { normalizeBody } from './middleware/validateRequest.js'
 import cors from 'cors'
 import './config/environment.js'
 import { errorHandler } from './middleware/errorHandler.js'
@@ -18,7 +20,7 @@ import { purgeExpiredDeletedStores } from './controllers/storeLifecycleControlle
 
 import { pool, testDatabaseConnection } from './config/database.js'
 
-const app = express()
+export const app = express()
 
 app.locals.dbPool = pool
 
@@ -41,10 +43,11 @@ app.use(
 )
 
 app.use(express.json())
+app.use(normalizeBody)
 
 app.use(
   '/uploads',
-  express.static(path.resolve('uploads'))
+  express.static(uploadsDirectory)
 )
 
 app.get('/api/health', async (_req, res) => {
@@ -174,6 +177,7 @@ app.use(
 |--------------------------------------------------------------------------
 */
 
+app.use('/api', (_req, res) => res.status(404).json({ message: 'ไม่พบ API ที่เรียกใช้งาน' }))
 app.use(errorHandler)
 
 
@@ -187,16 +191,6 @@ const port = Number(
   process.env.PORT || 5000
 )
 
-app.listen(
-  port,
-  process.env.HOST || '127.0.0.1',
-  () => {
-    console.log(
-      `POS backend listening at http://localhost:${port}`
-    )
-  }
-)
-
 async function cleanExpiredStoreData() {
   try {
     const removed = await purgeExpiredDeletedStores()
@@ -206,6 +200,18 @@ async function cleanExpiredStoreData() {
   }
 }
 
-cleanExpiredStoreData()
-const retentionCleanup = setInterval(cleanExpiredStoreData, 60 * 60 * 1000)
-retentionCleanup.unref()
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  app.listen(
+    port,
+    process.env.HOST || '127.0.0.1',
+    () => {
+      console.log(
+        `POS backend listening at http://localhost:${port}`
+      )
+    }
+  )
+
+  cleanExpiredStoreData()
+  const retentionCleanup = setInterval(cleanExpiredStoreData, 60 * 60 * 1000)
+  retentionCleanup.unref()
+}

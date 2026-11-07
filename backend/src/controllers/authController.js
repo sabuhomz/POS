@@ -14,6 +14,7 @@ async function sendOtp(email, code) {
   if (!smtpUser || !smtpPassword) {
     const error = new Error('ระบบส่งอีเมลยังไม่ได้ตั้งค่า กรุณาตั้งค่า SMTP_USER และ SMTP_APP_PASSWORD ใน backend')
     error.status = 503
+    error.expose = true
     throw error
   }
   const transporter = nodemailer.createTransport({
@@ -30,6 +31,7 @@ async function sendOtp(email, code) {
   } catch (cause) {
     const error = new Error('ส่งอีเมลไม่สำเร็จ กรุณาตรวจสอบการเชื่อมต่อ Gmail แล้วลองอีกครั้ง')
     error.status = 503
+    error.expose = true
     error.cause = cause
     throw error
   }
@@ -60,7 +62,9 @@ async function validateOtp(email, userId, purpose, code) {
     ORDER BY created_at DESC LIMIT 1`, [email, userId, purpose])
   const row = found.rows[0]
   if (!row || row.attempts >= 5) return false
-  const valid = crypto.timingSafeEqual(Buffer.from(row.code_hash, 'hex'), Buffer.from(otpHash(code), 'hex'))
+  const stored = Buffer.from(row.code_hash, 'hex')
+  const expected = Buffer.from(otpHash(code), 'hex')
+  const valid = stored.length === expected.length && crypto.timingSafeEqual(stored, expected)
   if (!valid) await query('UPDATE recovery_email_codes SET attempts=attempts+1 WHERE id=$1', [row.id])
   else await query('DELETE FROM recovery_email_codes WHERE id=$1', [row.id])
   return valid
@@ -124,6 +128,7 @@ export async function resetPassword(req, res, next) {
 
 export async function login(req, res, next) {
   try {
+    if (typeof req.body.username !== 'string' || typeof req.body.password !== 'string') return res.status(400).json({ message: 'กรุณากรอกชื่อผู้ใช้และรหัสผ่านเป็นข้อความ' })
     const username = String(req.body.username || '').trim()
     const password = String(req.body.password || '')
     if (!username || !password) return res.status(400).json({ message: 'Username and password are required' })
@@ -140,7 +145,14 @@ export async function login(req, res, next) {
 
     const permissions = await accountPermissions(query, user)
     const payload = { sub: String(user.id), username: user.username, role: user.role, storeId: user.store_id, permissions }
-    const accessToken = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '1h' })
+    let accessToken
+    try {
+      accessToken = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '1h' })
+    } catch (cause) {
+      const error = new Error('Invalid JWT configuration', { cause })
+      error.code = 'AUTH_CONFIG_INVALID'
+      throw error
+    }
     res.json({ accessToken, user: { id:user.id, username:user.username, role:user.role, storeId:user.store_id, permissions } })
   } catch (e) { next(e) }
 }
@@ -187,3 +199,4 @@ export async function changePassword(req, res, next) {
     next(error)
   }
 }
+

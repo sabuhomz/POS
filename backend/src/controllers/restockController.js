@@ -2,6 +2,11 @@ import { query, pool } from '../config/database.js'
 
 function normalizeBarcodes(value) {
   if (!Array.isArray(value)) return []
+  if (value.length > 1000 || value.some(item => typeof item !== 'string' || !item.trim() || item.trim().length > 150)) {
+    const error = new Error('บาร์โค้ดต้องเป็นข้อความไม่เกิน 150 ตัวอักษร และส่งไม่เกิน 1000 รายการต่อครั้ง')
+    error.status = 400
+    throw error
+  }
 
   return [
     ...new Set(
@@ -19,9 +24,9 @@ function normalizeBarcodes(value) {
 // ======================================================
 
 export async function createRestockRequest(req, res, next) {
-  const client = await pool.connect()
-
+  let client
   try {
+    client = await pool.connect()
     if (req.user.role !== 'EMPLOYEE') {
       return res.status(403).json({
         message: 'Only EMPLOYEE can create restock requests'
@@ -63,7 +68,7 @@ export async function createRestockRequest(req, res, next) {
     )
 
     if (!productResult.rowCount) {
-      await client.query('ROLLBACK')
+      await client?.query('ROLLBACK').catch(() => {})
 
       return res.status(404).json({
         message: 'ไม่พบสินค้า'
@@ -83,7 +88,7 @@ export async function createRestockRequest(req, res, next) {
     )
 
     if (duplicateResult.rowCount) {
-      await client.query('ROLLBACK')
+      await client?.query('ROLLBACK').catch(() => {})
 
       return res.status(409).json({
         message: 'มี Barcode ที่ถูกใช้แล้ว',
@@ -169,12 +174,12 @@ export async function createRestockRequest(req, res, next) {
     })
   } catch (error) {
     try {
-      await client.query('ROLLBACK')
+      await client?.query('ROLLBACK').catch(() => {})
     } catch {}
 
     next(error)
   } finally {
-    client.release()
+    client?.release()
   }
 }
 
@@ -185,9 +190,9 @@ export async function createRestockRequest(req, res, next) {
 // ======================================================
 
 export async function ownerAddStock(req, res, next) {
-  const client = await pool.connect()
-
+  let client
   try {
+    client = await pool.connect()
     if (req.user.role !== 'OWNER' && req.user.role !== 'ADMIN') {
       return res.status(403).json({
         message: 'เฉพาะ OWNER เท่านั้นที่เพิ่ม Stock โดยตรงได้'
@@ -229,7 +234,7 @@ export async function ownerAddStock(req, res, next) {
     )
 
     if (!productResult.rowCount) {
-      await client.query('ROLLBACK')
+      await client?.query('ROLLBACK').catch(() => {})
 
       return res.status(404).json({
         message: 'ไม่พบสินค้า'
@@ -247,7 +252,7 @@ export async function ownerAddStock(req, res, next) {
     )
 
     if (duplicateResult.rowCount) {
-      await client.query('ROLLBACK')
+      await client?.query('ROLLBACK').catch(() => {})
 
       return res.status(409).json({
         message: 'มี Barcode ที่ถูกใช้แล้ว',
@@ -304,12 +309,12 @@ export async function ownerAddStock(req, res, next) {
     })
   } catch (error) {
     try {
-      await client.query('ROLLBACK')
+      await client?.query('ROLLBACK').catch(() => {})
     } catch {}
 
     next(error)
   } finally {
-    client.release()
+    client?.release()
   }
 }
 
@@ -392,9 +397,9 @@ export async function listRestockRequests(req, res, next) {
 // ======================================================
 
 export async function approveRestockRequest(req, res, next) {
-  const client = await pool.connect()
-
+  let client
   try {
+    client = await pool.connect()
     if (req.user.role !== 'OWNER' && req.user.role !== 'ADMIN') {
       return res.status(403).json({
         message: 'เฉพาะ OWNER เท่านั้น'
@@ -427,7 +432,7 @@ export async function approveRestockRequest(req, res, next) {
     )
 
     if (!requestResult.rowCount) {
-      await client.query('ROLLBACK')
+      await client?.query('ROLLBACK').catch(() => {})
 
       return res.status(404).json({
         message: 'ไม่พบคำขอ'
@@ -437,7 +442,7 @@ export async function approveRestockRequest(req, res, next) {
     const request = requestResult.rows[0]
 
     if (request.status !== 'PENDING') {
-      await client.query('ROLLBACK')
+      await client?.query('ROLLBACK').catch(() => {})
 
       return res.status(409).json({
         message: 'คำขอนี้ถูกดำเนินการไปแล้ว'
@@ -466,7 +471,7 @@ export async function approveRestockRequest(req, res, next) {
     )
 
     if (!itemsResult.rowCount) {
-      await client.query('ROLLBACK')
+      await client?.query('ROLLBACK').catch(() => {})
 
       return res.status(409).json({
         message: 'คำขอนี้ไม่มี Barcode'
@@ -482,7 +487,7 @@ export async function approveRestockRequest(req, res, next) {
     )
 
     if (invalidItems.length) {
-      await client.query('ROLLBACK')
+      await client?.query('ROLLBACK').catch(() => {})
 
       return res.status(409).json({
         message: 'มีสินค้าในคำขอที่ไม่สามารถอนุมัติได้'
@@ -553,12 +558,12 @@ export async function approveRestockRequest(req, res, next) {
     })
   } catch (error) {
     try {
-      await client.query('ROLLBACK')
+      await client?.query('ROLLBACK').catch(() => {})
     } catch {}
 
     next(error)
   } finally {
-    client.release()
+    client?.release()
   }
 }
 
@@ -569,9 +574,9 @@ export async function approveRestockRequest(req, res, next) {
 // ======================================================
 
 export async function rejectRestockRequest(req, res, next) {
-  const client = await pool.connect()
-
+  let client
   try {
+    client = await pool.connect()
     if (req.user.role !== 'OWNER' && req.user.role !== 'ADMIN') {
       return res.status(403).json({
         message: 'เฉพาะ OWNER เท่านั้น'
@@ -603,7 +608,7 @@ export async function rejectRestockRequest(req, res, next) {
     )
 
     if (!requestResult.rowCount) {
-      await client.query('ROLLBACK')
+      await client?.query('ROLLBACK').catch(() => {})
 
       return res.status(404).json({
         message: 'ไม่พบคำขอ'
@@ -613,7 +618,7 @@ export async function rejectRestockRequest(req, res, next) {
     const request = requestResult.rows[0]
 
     if (request.status !== 'PENDING') {
-      await client.query('ROLLBACK')
+      await client?.query('ROLLBACK').catch(() => {})
 
       return res.status(409).json({
         message: 'คำขอนี้ถูกดำเนินการไปแล้ว'
@@ -666,11 +671,11 @@ export async function rejectRestockRequest(req, res, next) {
     })
   } catch (error) {
     try {
-      await client.query('ROLLBACK')
+      await client?.query('ROLLBACK').catch(() => {})
     } catch {}
 
     next(error)
   } finally {
-    client.release()
+    client?.release()
   }
 }

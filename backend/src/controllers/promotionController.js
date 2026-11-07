@@ -15,7 +15,7 @@ function normalizePromotionType(type) {
   return String(type || '').trim().toUpperCase()
 }
 
-function validatePromotionPayload(body) {
+function validatePromotionPayload(body = {}) {
   const {
     name,
     promotion_type,
@@ -39,8 +39,11 @@ function validatePromotionPayload(body) {
     return 'กรุณาเลือกสินค้าอย่างน้อย 1 รายการ'
   }
 
+  if (new Set(products.map(item => String(item?.product_id))).size !== products.length) return 'รายการสินค้าในโปรโมชั่นซ้ำกัน'
+  if (!Number.isInteger(Number(body.priority || 0)) || Math.abs(Number(body.priority || 0)) > 2147483647) return 'ลำดับความสำคัญต้องเป็นจำนวนเต็ม'
+  if (rule !== undefined && (rule === null || Array.isArray(rule) || typeof rule !== 'object')) return 'ข้อมูลเงื่อนไขโปรโมชั่นไม่ถูกต้อง'
   for (const item of products) {
-    if (!item.product_id) {
+    if (!item || !Number.isSafeInteger(Number(item.product_id)) || Number(item.product_id) < 1) {
       return 'ข้อมูลสินค้าไม่ถูกต้อง'
     }
 
@@ -51,6 +54,10 @@ function validatePromotionPayload(body) {
     }
   }
 
+  for (const value of [start_at, end_at]) {
+    if (value && !Number.isFinite(new Date(value).getTime())) return 'วันที่โปรโมชั่นไม่ถูกต้อง'
+  }
+  if (String(name).trim().length > 200) return 'ชื่อโปรโมชั่นต้องไม่เกิน 200 ตัวอักษร'
   if (start_at && end_at) {
     const start = new Date(start_at)
     const end = new Date(end_at)
@@ -307,9 +314,9 @@ export async function getPromotion(req, res, next) {
 */
 
 export async function createPromotion(req, res, next) {
-  const client = await req.app.locals.dbPool.connect()
-
+  let client
   try {
+    client = await req.app.locals.dbPool.connect()
     const body = req.body
 
     const validationError = validatePromotionPayload(body)
@@ -366,7 +373,7 @@ export async function createPromotion(req, res, next) {
     const promotion = promotionResult.rows[0]
 
     for (const item of body.products) {
-      await client.query(
+      const inserted = await client.query(
         `
         INSERT INTO promotion_products (
           promotion_id,
@@ -388,6 +395,11 @@ export async function createPromotion(req, res, next) {
           req.user.storeId
         ]
       )
+      if (!inserted.rowCount) {
+        const error = new Error('ไม่พบสินค้าที่เลือกในร้านนี้ กรุณาเลือกสินค้าใหม่')
+        error.status = 400
+        throw error
+      }
     }
 
     const rule = body.rule || {}
@@ -415,12 +427,12 @@ export async function createPromotion(req, res, next) {
       `,
       [
         promotion.id,
-        rule.min_quantity ?? null,
-        rule.min_amount ?? null,
-        rule.discount_percent ?? null,
-        rule.discount_amount ?? null,
-        rule.special_price ?? null,
-        rule.bundle_quantity ?? null
+        rule.min_quantity === '' ? null : (rule.min_quantity ?? null),
+        rule.min_amount === '' ? null : (rule.min_amount ?? null),
+        rule.discount_percent === '' ? null : (rule.discount_percent ?? null),
+        rule.discount_amount === '' ? null : (rule.discount_amount ?? null),
+        rule.special_price === '' ? null : (rule.special_price ?? null),
+        rule.bundle_quantity === '' ? null : (rule.bundle_quantity ?? null)
       ]
     )
 
@@ -431,10 +443,10 @@ export async function createPromotion(req, res, next) {
       promotion_id: promotion.id
     })
   } catch (error) {
-    await client.query('ROLLBACK')
+    await client?.query('ROLLBACK').catch(() => {})
     next(error)
   } finally {
-    client.release()
+    client?.release()
   }
 }
 
@@ -446,9 +458,9 @@ export async function createPromotion(req, res, next) {
 */
 
 export async function updatePromotion(req, res, next) {
-  const client = await req.app.locals.dbPool.connect()
-
+  let client
   try {
+    client = await req.app.locals.dbPool.connect()
     const body = req.body
 
     const validationError = validatePromotionPayload(body)
@@ -493,7 +505,7 @@ export async function updatePromotion(req, res, next) {
     )
 
     if (!promotionResult.rowCount) {
-      await client.query('ROLLBACK')
+      await client?.query('ROLLBACK').catch(() => {})
 
       return res.status(404).json({
         message: 'Promotion not found'
@@ -509,7 +521,7 @@ export async function updatePromotion(req, res, next) {
     )
 
     for (const item of body.products) {
-      await client.query(
+      const inserted = await client.query(
         `
         INSERT INTO promotion_products (
           promotion_id,
@@ -531,6 +543,11 @@ export async function updatePromotion(req, res, next) {
           req.user.storeId
         ]
       )
+      if (!inserted.rowCount) {
+        const error = new Error('ไม่พบสินค้าที่เลือกในร้านนี้ กรุณาเลือกสินค้าใหม่')
+        error.status = 400
+        throw error
+      }
     }
 
     await client.query(
@@ -566,12 +583,12 @@ export async function updatePromotion(req, res, next) {
       `,
       [
         req.params.id,
-        rule.min_quantity ?? null,
-        rule.min_amount ?? null,
-        rule.discount_percent ?? null,
-        rule.discount_amount ?? null,
-        rule.special_price ?? null,
-        rule.bundle_quantity ?? null
+        rule.min_quantity === '' ? null : (rule.min_quantity ?? null),
+        rule.min_amount === '' ? null : (rule.min_amount ?? null),
+        rule.discount_percent === '' ? null : (rule.discount_percent ?? null),
+        rule.discount_amount === '' ? null : (rule.discount_amount ?? null),
+        rule.special_price === '' ? null : (rule.special_price ?? null),
+        rule.bundle_quantity === '' ? null : (rule.bundle_quantity ?? null)
       ]
     )
 
@@ -581,10 +598,10 @@ export async function updatePromotion(req, res, next) {
       message: 'แก้ไขโปรโมชั่นสำเร็จ'
     })
   } catch (error) {
-    await client.query('ROLLBACK')
+    await client?.query('ROLLBACK').catch(() => {})
     next(error)
   } finally {
-    client.release()
+    client?.release()
   }
 }
 
