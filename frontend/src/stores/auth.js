@@ -28,7 +28,7 @@ export const useAuthStore = defineStore("auth", () => {
     () => decodeToken(token.value)?.storeId || user.value?.storeId || null,
   );
   function hasPermission(permission) {
-    return role.value === "ADMIN" || permissions.value.includes(permission);
+    return role.value === "ADMIN" || (role.value === "OWNER" && !!storeId.value) || permissions.value.includes(permission);
   }
   async function login(username, password) {
     const { data } = await api.post("/auth/login", { username, password });

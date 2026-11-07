@@ -43,7 +43,6 @@ watch(() => route.path, closeMenu)
         <RouterLink to="/admin" class="sidebar-link">Dashboard</RouterLink>
         <RouterLink to="/admin/stores" class="sidebar-link">Stores</RouterLink>
         <RouterLink to="/admin/store-owners" class="sidebar-link">Store Owners</RouterLink>
-        <RouterLink to="/admin/permissions" class="sidebar-link">Permissions</RouterLink>
       </nav>
 
       <div class="sidebar-footer">

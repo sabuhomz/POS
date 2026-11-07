@@ -6,7 +6,6 @@ import { errorHandler } from './middleware/errorHandler.js'
 
 import authRoutes from './routes/auth.js'
 import adminRoutes from './routes/admin.js'
-import permissionRoutes from './routes/permissions.js'
 import productRoutes from './routes/products.js'
 import storeLifecycleRoutes from './routes/storeLifecycle.js'
 import ownerDashboardRoutes from './routes/ownerDashboard.js'
@@ -89,10 +88,6 @@ app.use(
   adminRoutes
 )
 
-app.use(
-  '/api/admin',
-  permissionRoutes
-)
 
 
 /*

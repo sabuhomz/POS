@@ -47,8 +47,7 @@ const routes = [
       },
       {
         path: "permissions",
-        name: "admin-permissions",
-        component: () => import("../views/admin/PermissionsView.vue"),
+        redirect: "/admin/store-owners",
       },
     ],
   },

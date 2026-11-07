@@ -101,21 +101,3 @@ export async function updateUserStatus(req, res, next) {
   } catch (e) { next(e) }
 }
 
-export async function updateUserPermissions(req, res, next) {
-  const client = await pool.connect()
-  try {
-    const userId = Number(req.params.id)
-    const permissions = Array.isArray(req.body.permissions) ? [...new Set(req.body.permissions)] : []
-    const valid = await client.query('SELECT permission_key FROM permissions WHERE permission_key = ANY($1::text[])', [permissions])
-    const allowed = valid.rows.map(r => r.permission_key)
-
-    await client.query('BEGIN')
-    await client.query('DELETE FROM user_permissions WHERE user_id=$1', [userId])
-    for (const key of allowed) await client.query('INSERT INTO user_permissions(user_id,permission_key) VALUES($1,$2) ON CONFLICT DO NOTHING', [userId,key])
-    await client.query('COMMIT')
-    res.json({ userId, permissions: allowed })
-  } catch (e) {
-    await client.query('ROLLBACK')
-    next(e)
-  } finally { client.release() }
-}
