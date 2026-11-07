@@ -17,6 +17,7 @@ import restockRoutes from './routes/restock.js'
 import promotionRoutes from './routes/promotions.js'
 import shiftRoutes from './routes/shifts.js'
 import salesRoutes from './routes/sales.js'
+import saleCorrectionRoutes from './routes/saleCorrections.js'
 import { purgeExpiredDeletedStores } from './controllers/storeLifecycleController.js'
 
 import { pool, testDatabaseConnection } from './config/database.js'
@@ -162,7 +163,8 @@ app.use(
 
 
 
-app.use('/api/sales', salesRoutes)/*
+app.use('/api/sales', salesRoutes)
+app.use('/api/receipts', saleCorrectionRoutes)/*
 |--------------------------------------------------------------------------
 | STORE
 |--------------------------------------------------------------------------

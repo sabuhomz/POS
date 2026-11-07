@@ -82,7 +82,6 @@ onMounted(loadDashboard)
     <div class="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
       <div>
         <h1 class="text-2xl font-bold text-slate-900">Dashboard วิเคราะห์ยอดขาย</h1>
-        <p class="mt-1 text-sm text-slate-500">เลือกช่วงเวลาย้อนหลังได้สูงสุด 1 ปี โดยแสดงข้อมูลเฉพาะร้านของคุณ</p>
       </div>
       <button type="button" class="btn border border-slate-300 bg-white text-slate-800" :disabled="loading" @click="loadDashboard">
         {{ loading ? 'กำลังโหลด...' : '↻ รีเฟรชข้อมูล' }}
@@ -114,7 +113,7 @@ onMounted(loadDashboard)
         </label>
         <button type="button" class="btn bg-teal-700 text-white" :disabled="loading" @click="loadDashboard">แสดงผล</button>
       </div>
-      <p class="mt-3 text-xs text-slate-500">ช่วงที่เลือก {{ rangeDays.toFixed(1) }} วัน • นับยอดขายที่บันทึกจริงในช่วงวันและเวลาดังกล่าว</p>
+      <p class="mt-3 text-xs text-slate-500">ช่วงที่เลือก {{ rangeDays.toFixed(1) }} วัน </p>
     </section>
 
     <div v-if="errorMessage" role="alert" class="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">{{ errorMessage }}</div>
@@ -160,14 +159,12 @@ onMounted(loadDashboard)
           </div>
         </div>
       </div>
-      <p class="mt-3 text-xs text-slate-500">กราฟแสดงเฉพาะวันหรือเดือนที่มีรายการขาย และสามารถเลื่อนดูย้อนหลังได้</p>
     </section>
 
     <div class="grid gap-6 xl:grid-cols-2">
       <section class="card">
         <div class="mb-4">
           <h2>สินค้าขายดี เรียงตามจำนวนขาย</h2>
-          <p class="text-sm text-slate-500">เลือกช่วงวันและเวลาได้ด้านบน • เรียงจากจำนวนมากไปน้อย</p>
         </div>
         <div v-if="!topProducts.length" class="empty">ไม่มีข้อมูลสินค้าขายดี</div>
         <div v-else class="max-h-[520px] overflow-auto">
@@ -193,7 +190,6 @@ onMounted(loadDashboard)
       <section class="card">
         <div class="mb-4">
           <h2>ยอดขายแยกตามพนักงาน</h2>
-          <p class="text-sm text-slate-500">ยอดขายสุทธิของแต่ละบัญชีในช่วงที่เลือก</p>
         </div>
         <div v-if="!employees.length" class="empty">ไม่มีข้อมูลพนักงานที่ขายสินค้าในช่วงนี้</div>
         <div v-else class="max-h-[520px] overflow-auto">
@@ -215,7 +211,6 @@ onMounted(loadDashboard)
     <section class="card">
       <div class="mb-4">
         <h2>คำแนะนำการสั่งสินค้า</h2>
-        <p class="text-sm text-slate-500">วิเคราะห์จากจำนวนขายในช่วงที่เลือก เทียบกับสต็อกคงเหลือปัจจุบัน</p>
       </div>
       <div class="mb-4 grid gap-3 sm:grid-cols-3">
         <div class="rounded-xl bg-rose-50 p-4 text-rose-900">
@@ -253,7 +248,6 @@ onMounted(loadDashboard)
           </tbody>
         </table>
       </div>
-      <p class="mt-4 text-xs leading-relaxed text-slate-500">{{ dashboard.recommendationNote }}</p>
     </section>
   </div>
 </template>

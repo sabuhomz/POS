@@ -12,7 +12,9 @@ const selectableKeys = [
   'sale.create',
   'inventory.restock.request',
   'inventory.restock.direct',
-  'sale.view'
+  'sale.view',
+  'sale.correction.request',
+  'sale.correction.direct'
 ]
 // The desktop app must load /api/products on login even for staff who only
 // use the history page. Grant product.view as a required internal dependency,
@@ -69,6 +71,10 @@ router.put('/permissions/employees/:id', async (req, res, next) => {
         VALUES ('inventory.restock.direct', 'Direct barcode restock in Python POS')
         ON CONFLICT (permission_key) DO NOTHING`)
     }
+    await client.query(`INSERT INTO permissions(permission_key,description) VALUES
+      ('sale.correction.request','Request receipt corrections'),
+      ('sale.correction.direct','Direct receipt corrections')
+      ON CONFLICT (permission_key) DO NOTHING`)
     const catalog = await client.query(
       'SELECT permission_key FROM permissions WHERE permission_key = ANY($1::varchar[])',
       [permissions]

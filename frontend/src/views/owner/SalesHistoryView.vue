@@ -78,11 +78,7 @@
         <div>
           <label class="mb-1 block text-sm font-medium text-gray-700">การชำระเงิน</label>
           <select v-model="filters.paymentMethod" class="w-full rounded-lg border border-gray-300 px-3 py-2">
-            <option value="">ทั้งหมด</option>
-            <option value="CASH">เงินสด</option>
             <option value="QR">QR</option>
-            <option value="CARD">บัตร</option>
-            <option value="TRANSFER">โอนเงิน</option>
           </select>
         </div>
         <div>

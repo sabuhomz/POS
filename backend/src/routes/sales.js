@@ -107,6 +107,10 @@ router.post('/', requirePermission('sale.create'), async (req,res,next)=>{
     const sale=await client.query(`INSERT INTO sales(store_id,receipt_number,employee_id,subtotal,discount,tax,total,payment_method)
       VALUES($1,$2,$3,$4,$5,0,$6,'QR') RETURNING id`,
       [storeId,receipt,userId,priced.subtotal,priced.discount,priced.total])
+    // Keep exact barcodes linked to the receipt for reliable stock restoration.
+    for (const unit of units.rows) {
+      await client.query('INSERT INTO sale_unit_links(sale_id,product_item_id) VALUES($1,$2)', [sale.rows[0].id,unit.id])
+    }
     for(const [id,p] of byProduct){
       const line=priced.lines.find(item=>item.id===Number(id))
       await client.query(`INSERT INTO sale_items(sale_id,product_id,product_name_snapshot,quantity,unit_price,discount,subtotal)

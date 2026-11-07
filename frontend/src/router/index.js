@@ -106,7 +106,7 @@ const routes = [
         name: "owner-restock",
         component: () => import("../views/owner/RestockRequestsView.vue"),
         meta: {
-          permission: "inventory.restock.approve",
+          roles: ["OWNER"],
         },
       },
       {
