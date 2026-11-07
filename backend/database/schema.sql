@@ -300,6 +300,7 @@ INSERT INTO permissions (permission_key, description) VALUES
 ('report.top-products', 'Top-selling products'),
 ('report.weekly', 'Weekly sales report'),
 ('inventory.restock.request', 'Request stock using unique barcodes'),
+('inventory.restock.direct', 'Direct barcode restock in Python POS'),
 ('inventory.restock.view', 'View restock requests'),
 ('inventory.restock.reject', 'Reject restock requests')
 ON CONFLICT (permission_key) DO UPDATE
