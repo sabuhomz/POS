@@ -40,7 +40,7 @@ export async function getOwnerSalesAnalytics(req, res, next) {
         SELECT COUNT(*)::int AS orders, COALESCE(SUM(total),0) AS revenue,
           COALESCE(SUM(subtotal),0) AS subtotal,
           COALESCE(SUM(discount),0) AS discount
-        FROM sales WHERE store_id=$1 AND created_at >= $2 AND created_at <= $3
+        FROM sales WHERE store_id=$1 AND correction_status='ACTIVE' AND created_at >= $2 AND created_at <= $3
       `, params),
       query(`
         SELECT si.product_id AS "productId", si.product_name_snapshot AS name,
@@ -49,7 +49,7 @@ export async function getOwnerSalesAnalytics(req, res, next) {
           COALESCE(SUM(si.discount),0) AS discount
         FROM sale_items si
         JOIN sales s ON s.id=si.sale_id
-        WHERE s.store_id=$1 AND s.created_at >= $2 AND s.created_at <= $3
+        WHERE s.store_id=$1 AND s.correction_status='ACTIVE' AND s.created_at >= $2 AND s.created_at <= $3
         GROUP BY si.product_id, si.product_name_snapshot
         ORDER BY quantity DESC, revenue DESC, name ASC
       `, params),
@@ -60,7 +60,7 @@ export async function getOwnerSalesAnalytics(req, res, next) {
           COALESCE(SUM(s.total),0) AS revenue
         FROM sales s
         LEFT JOIN users u ON u.id=s.employee_id AND u.store_id=s.store_id
-        WHERE s.store_id=$1 AND s.created_at >= $2 AND s.created_at <= $3
+        WHERE s.store_id=$1 AND s.correction_status='ACTIVE' AND s.created_at >= $2 AND s.created_at <= $3
         GROUP BY s.employee_id, u.username
         ORDER BY revenue DESC, orders DESC, username ASC
       `, params),
@@ -68,7 +68,7 @@ export async function getOwnerSalesAnalytics(req, res, next) {
         SELECT ${dateExpression} AS period,
           COUNT(*)::int AS orders, COALESCE(SUM(s.total),0) AS revenue
         FROM sales s
-        WHERE s.store_id=$1 AND s.created_at >= $2 AND s.created_at <= $3
+        WHERE s.store_id=$1 AND s.correction_status='ACTIVE' AND s.created_at >= $2 AND s.created_at <= $3
         GROUP BY period ORDER BY period ASC
       `, params),
       query(`
@@ -78,7 +78,7 @@ export async function getOwnerSalesAnalytics(req, res, next) {
         LEFT JOIN (
           SELECT si.product_id, si.quantity
           FROM sale_items si JOIN sales s ON s.id=si.sale_id
-          WHERE s.store_id=$1 AND s.created_at >= $2 AND s.created_at <= $3
+          WHERE s.store_id=$1 AND s.correction_status='ACTIVE' AND s.created_at >= $2 AND s.created_at <= $3
         ) si ON si.product_id=p.id
         WHERE p.store_id=$1
         GROUP BY p.id
@@ -100,7 +100,7 @@ export async function getOwnerSalesAnalytics(req, res, next) {
     const unitRows = await query(`
       SELECT s.employee_id AS "employeeId", COALESCE(SUM(si.quantity),0)::int AS units
       FROM sales s JOIN sale_items si ON si.sale_id=s.id
-      WHERE s.store_id=$1 AND s.created_at >= $2 AND s.created_at <= $3
+      WHERE s.store_id=$1 AND s.correction_status='ACTIVE' AND s.created_at >= $2 AND s.created_at <= $3
       GROUP BY s.employee_id
     `, params)
     const unitMap = new Map(unitRows.rows.map(row => [String(row.employeeId), Number(row.units)]))
