@@ -11,6 +11,7 @@ export async function getOwnerDashboard(req, res, next) {
          COALESCE(AVG(total), 0) AS average_order
        FROM sales
        WHERE store_id = $1
+         AND correction_status = 'ACTIVE'
          AND created_at::date = CURRENT_DATE`,
       [storeId]
     )
@@ -25,7 +26,7 @@ export async function getOwnerDashboard(req, res, next) {
          COALESCE(SUM(si.subtotal), 0) AS "totalSales"
        FROM sale_items si
        JOIN sales s ON s.id = si.sale_id
-       WHERE s.store_id = $1
+       WHERE s.store_id = $1 AND s.correction_status = 'ACTIVE'
        GROUP BY si.product_id, si.product_name_snapshot
        ORDER BY quantity DESC, "totalSales" DESC
        LIMIT 5`,
@@ -37,7 +38,7 @@ export async function getOwnerDashboard(req, res, next) {
          created_at::date AS date,
          COALESCE(SUM(total), 0) AS "totalSales"
        FROM sales
-       WHERE store_id = $1
+       WHERE store_id = $1 AND correction_status = 'ACTIVE'
          AND created_at >= CURRENT_DATE - INTERVAL '28 days'
        GROUP BY created_at::date
        ORDER BY created_at::date`,
@@ -49,7 +50,7 @@ export async function getOwnerDashboard(req, res, next) {
          TO_CHAR(date_trunc('week', created_at), 'DD Mon') AS label,
          COALESCE(SUM(total), 0) AS total
        FROM sales
-       WHERE store_id = $1
+       WHERE store_id = $1 AND correction_status = 'ACTIVE'
          AND created_at >= CURRENT_DATE - INTERVAL '28 days'
        GROUP BY date_trunc('week', created_at)
        ORDER BY date_trunc('week', created_at)`,
@@ -103,7 +104,7 @@ export async function getSlowMovingInventory(req, res, next) {
          SELECT MAX(s.created_at) AS last_sold_at
          FROM sale_items si
          JOIN sales s ON s.id = si.sale_id
-         WHERE si.product_id = p.id AND s.store_id = p.store_id
+         WHERE si.product_id = p.id AND s.store_id = p.store_id AND s.correction_status = 'ACTIVE'
        ) latest ON TRUE
        WHERE p.store_id = $1
          AND p.stock > 0
