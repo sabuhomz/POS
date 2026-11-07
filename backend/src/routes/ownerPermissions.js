@@ -8,18 +8,21 @@ router.use(authenticate, requireRole('OWNER'))
 
 // Only permissions exercised by the Python POS touchscreen app.
 // Other existing permissions remain untouched when the owner saves.
-const allowedKeys = [
-  'product.view',
+const selectableKeys = [
   'sale.create',
   'inventory.restock.request',
   'sale.view'
 ]
+// The desktop app must load /api/products on login even for staff who only
+// use the history page. Grant product.view as a required internal dependency,
+// not as a separate website-facing permission checkbox.
+const managedKeys = ['product.view', ...selectableKeys]
 
 router.get('/permissions/catalog', async (_req, res, next) => {
   try {
     const result = await pool.query(
       'SELECT permission_key FROM permissions WHERE permission_key = ANY($1::varchar[]) ORDER BY permission_key',
-      [allowedKeys]
+      [selectableKeys]
     )
     res.json({ permissions: result.rows.map(row => row.permission_key) })
   } catch (error) { next(error) }
@@ -45,8 +48,8 @@ router.put('/permissions/employees/:id', async (req, res, next) => {
   const id = Number(req.params.id)
   const permissions = req.body?.permissions
   if (!Number.isSafeInteger(id) || id < 1 || !Array.isArray(permissions) ||
-      permissions.length > allowedKeys.length ||
-      permissions.some(key => typeof key !== 'string' || !allowedKeys.includes(key)) ||
+      permissions.length > selectableKeys.length ||
+      permissions.some(key => typeof key !== 'string' || !selectableKeys.includes(key)) ||
       new Set(permissions).size !== permissions.length) {
     return res.status(400).json({ message: 'รายการสิทธิ์ไม่ถูกต้อง' })
   }
@@ -74,14 +77,15 @@ router.put('/permissions/employees/:id', async (req, res, next) => {
     // any other existing keys instead of silently revoking unrelated access.
     await client.query(
       'DELETE FROM user_permissions WHERE user_id=$1 AND permission_key = ANY($2::varchar[])',
-      [id, allowedKeys]
+      [id, managedKeys]
     )
-    if (permissions.length) {
+    const effectivePermissions = ['product.view', ...permissions]
+    if (effectivePermissions.length) {
       await client.query(`
         INSERT INTO user_permissions (user_id, permission_key)
         SELECT $1, unnest($2::varchar[])
         ON CONFLICT DO NOTHING
-      `, [id, permissions])
+      `, [id, effectivePermissions])
     }
     await client.query('COMMIT')
     res.json({ message: 'บันทึกสิทธิ์พนักงานแล้ว', employeeId: id, permissions })
