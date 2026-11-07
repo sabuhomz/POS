@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { randomUUID } from 'node:crypto'
 import { pool } from '../config/database.js'
+import { priceCart } from '../services/salePricing.js'
 import { authenticate } from '../middleware/auth.js'
 import { requirePermission } from '../middleware/permission.js'
 
@@ -21,6 +22,47 @@ router.get('/barcode/:barcode', requirePermission('sale.create'), async (req, re
   } catch(e){ next(e) }
 })
 
+// Preview uses the same server-side pricing logic as the final sale.
+router.post('/quote', requirePermission('sale.create'), async (req, res, next) => {
+  try {
+    const barcodes = req.body?.barcodes
+    if (!Array.isArray(barcodes) || barcodes.length > 200 ||
+        barcodes.some(x => typeof x !== 'string' || !x.trim() || x.length > 150) ||
+        new Set(barcodes).size !== barcodes.length) {
+      return res.status(400).json({ message: 'บาร์โค้ดไม่ถูกต้อง' })
+    }
+    if (!barcodes.length) {
+      return res.json({
+        subtotal: '0.00', discount: '0.00', total: '0.00',
+        promotion: null, lines: []
+      })
+    }
+    const result = await pool.query(`
+      SELECT pi.barcode,pi.status,p.id AS product_id,p.name,p.price,p.stock
+      FROM product_items pi
+      JOIN products p ON p.id=pi.product_id AND p.store_id=pi.store_id
+      WHERE pi.barcode=ANY($1::varchar[]) AND pi.store_id=$2
+    `, [barcodes, req.user.storeId])
+    if (result.rowCount !== barcodes.length ||
+        result.rows.some(row => row.status !== 'IN_STOCK')) {
+      return res.status(409).json({ message: 'มีสินค้าถูกขายแล้วหรือยังไม่พร้อมขาย กรุณาสแกนใหม่' })
+    }
+    const byProduct = new Map()
+    for (const unit of result.rows) {
+      const id = Number(unit.product_id)
+      const current = byProduct.get(id) || {
+        name: unit.name, price: unit.price, stock: Number(unit.stock), quantity: 0
+      }
+      current.quantity++
+      byProduct.set(id, current)
+    }
+    if ([...byProduct.values()].some(p => p.quantity > p.stock)) {
+      return res.status(409).json({ message: 'สต็อกสินค้าไม่เพียงพอ' })
+    }
+    res.json(await priceCart(pool.query.bind(pool), req.user.storeId, byProduct))
+  } catch (error) { next(error) }
+})
+
 // The client confirms it saw the payment, but this endpoint does NOT independently verify payment.
 router.post('/', requirePermission('sale.create'), async (req,res,next)=>{
   const storeId=Number(req.user.storeId),userId=Number(req.user.sub)
@@ -29,7 +71,8 @@ router.post('/', requirePermission('sale.create'), async (req,res,next)=>{
       req.body?.paymentMethod!=='QR' || req.body?.paymentConfirmed!==true ||
       !Array.isArray(barcodes)||!barcodes.length||barcodes.length>200||
       barcodes.some(x=>typeof x!=='string'||!x.trim()||x.length>150)||
-      new Set(barcodes).size!==barcodes.length)
+      new Set(barcodes).size!==barcodes.length ||
+      typeof req.body?.expectedTotal!=='string' || !/^\d+\.\d{2}$/.test(req.body.expectedTotal))
     return res.status(400).json({message:'ข้อมูลการขายไม่ถูกต้อง ต้องเป็นบาร์โค้ดไม่ซ้ำและชำระแบบ QR เท่านั้น'})
   const client=await pool.connect()
   try {
@@ -56,24 +99,26 @@ router.post('/', requirePermission('sale.create'), async (req,res,next)=>{
     const byProduct=new Map()
     for(const u of units.rows){const id=Number(u.product_id);const entry=byProduct.get(id)||{name:u.name,price:u.price,stock:Number(u.stock),quantity:0};entry.quantity++;byProduct.set(id,entry)}
     for(const e of byProduct.values())if(e.quantity>e.stock){const x=new Error(`สต็อก ${e.name} ไม่เพียงพอ`);x.status=409;throw x}
-    const toCents=v=>{const [a,b='']=String(v).split('.');return BigInt(a)*100n+BigInt(b.padEnd(2,'0').slice(0,2))}
-    const display=c=>`${c/100n}.${String(c%100n).padStart(2,'0')}`
-    let cents=0n
-    for(const e of byProduct.values())cents+=toCents(e.price)*BigInt(e.quantity)
-    if(cents>999999999999n){const e=new Error('ยอดรวมสูงเกินไป');e.status=400;throw e}
-    const total=display(cents),receipt=`POS-${Date.now()}-${randomUUID().slice(0,8)}`
+    const priced=await priceCart(client.query.bind(client),storeId,byProduct)
+    if (priced.total!==req.body.expectedTotal) {
+      const e=new Error('ยอดโปรโมชั่นเปลี่ยน กรุณากลับไปตรวจสอบยอดก่อนชำระ');e.status=409;throw e
+    }
+    const receipt=`POS-${Date.now()}-${randomUUID().slice(0,8)}`
     const sale=await client.query(`INSERT INTO sales(store_id,receipt_number,employee_id,subtotal,discount,tax,total,payment_method)
-      VALUES($1,$2,$3,$4,0,0,$4,'QR') RETURNING id`,[storeId,receipt,userId,total])
+      VALUES($1,$2,$3,$4,$5,0,$6,'QR') RETURNING id`,
+      [storeId,receipt,userId,priced.subtotal,priced.discount,priced.total])
     for(const [id,p] of byProduct){
+      const line=priced.lines.find(item=>item.id===Number(id))
       await client.query(`INSERT INTO sale_items(sale_id,product_id,product_name_snapshot,quantity,unit_price,discount,subtotal)
-        VALUES($1,$2,$3,$4,$5,0,$6)`,[sale.rows[0].id,id,p.name,p.quantity,p.price,display(toCents(p.price)*BigInt(p.quantity))])
+        VALUES($1,$2,$3,$4,$5,$6,$7)`,
+        [sale.rows[0].id,id,p.name,p.quantity,p.price,line.discount,line.total])
       await client.query(`UPDATE products SET stock=stock-$1,updated_at=NOW() WHERE id=$2 AND store_id=$3`,[p.quantity,id,storeId])
     }
     const changed=await client.query(`UPDATE product_items SET status='SOLD',updated_at=NOW()
       WHERE id=ANY($1::bigint[]) AND store_id=$2 AND status='IN_STOCK' RETURNING id`,[units.rows.map(x=>x.id),storeId])
     if(changed.rowCount!==barcodes.length){const e=new Error('จำนวนบาร์โค้ดเปลี่ยนแปลง กรุณาลองใหม่');e.status=409;throw e}
     await client.query('COMMIT')
-    res.status(201).json({saleId:sale.rows[0].id,receiptNumber:receipt,total,paymentMethod:'QR'})
+    res.status(201).json({saleId:sale.rows[0].id,receiptNumber:receipt,total:priced.total,subtotal:priced.subtotal,discount:priced.discount,promotion:priced.promotion,paymentMethod:'QR'})
   }catch(e){await client.query('ROLLBACK').catch(()=>{});next(e)}finally{client.release()}
 })
 export default router
