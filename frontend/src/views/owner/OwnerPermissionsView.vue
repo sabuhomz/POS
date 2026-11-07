@@ -3,19 +3,29 @@ import { ref, computed, onMounted } from 'vue'
 import api from '../../services/api'
 
 const groups = [
-  { title: 'ขายสินค้า', entries: [
-    ['sale.create', 'สแกนสินค้าเข้าตะกร้าและรับชำระ QR']
-  ] },
-  { title: 'เพิ่มสต็อก', entries: [
-    ['inventory.restock.request', 'สแกนเพิ่มสินค้าและส่งคำขออนุมัติ'],
-    ['inventory.restock.direct', 'สแกนเพิ่มสินค้าเข้าสต็อกทันที (ไม่ต้องส่งคำขอ)']
-  ] },
-  { title: 'ประวัติการขาย', entries: [
-    ['sale.view', 'ดูประวัติการขายและรายละเอียดใบเสร็จ'],
-    ['sale.correction.request', 'ขอยกเลิกหรือแก้ไขยอดใบเสร็จ (รอ Owner อนุมัติ)'],
-    ['sale.correction.direct', 'ยกเลิกหรือแก้ไขยอดใบเสร็จได้ทันที (ไม่ต้องส่งคำขอ)']
-  ] }
+  {
+    title: 'ขายสินค้า',
+    entries: [
+      ['sale.create', 'สแกนสินค้าเข้าตะกร้าและรับชำระ QR']
+    ]
+  },
+  {
+    title: 'เพิ่มสต็อก',
+    entries: [
+      ['inventory.restock.request', 'สแกนเพิ่มสินค้าและส่งคำขออนุมัติ'],
+      ['inventory.restock.direct', 'สแกนเพิ่มสินค้าเข้าสต็อกทันที (ไม่ต้องส่งคำขอ)']
+    ]
+  },
+  {
+    title: 'ประวัติการขาย',
+    entries: [
+      ['sale.view', 'ดูประวัติการขายและรายละเอียดใบเสร็จ'],
+      ['sale.correction.request', 'ขอยกเลิกหรือแก้ไขยอดใบเสร็จ (รอ Owner อนุมัติ)'],
+      ['sale.correction.direct', 'ยกเลิกหรือแก้ไขยอดใบเสร็จได้ทันที (ไม่ต้องส่งคำขอ)']
+    ]
+  }
 ]
+
 const employees = ref([])
 const catalog = ref([])
 const selectedId = ref('')
@@ -83,6 +93,7 @@ onMounted(load)
     <div class="heading">
       <div>
         <h1>กำหนดสิทธิ์พนักงาน</h1>
+        <p>กำหนดสิทธิ์การใช้งานแอป POS และการจัดการใบเสร็จเป็นรายพนักงาน</p>
       </div>
       <button class="secondary" type="button" :disabled="loading || saving" @click="load">↻ รีเฟรช</button>
     </div>
