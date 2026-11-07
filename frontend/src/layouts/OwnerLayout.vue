@@ -43,6 +43,7 @@ watch(() => route.path, closeMenu)
         <RouterLink to="/owner" class="sidebar-link">สรุปข้อมูลการขาย</RouterLink>
         <RouterLink to="/owner/inventory" class="sidebar-link">คลังสินค้า</RouterLink>
         <RouterLink to="/owner/employees" class="sidebar-link">พนักงาน</RouterLink>
+        <RouterLink to="/owner/permissions" class="sidebar-link">กำหนดสิทธิ์พนักงาน</RouterLink>
         <RouterLink to="/owner/promotions" class="sidebar-link">โปรโมชั่น</RouterLink>
         <RouterLink to="/owner/restock-requests" class="sidebar-link">คำขอเพิ่มจำนวนสินค้า</RouterLink>
         <RouterLink to="/owner/sales-history" class="sidebar-link">ประวัติการขาย</RouterLink>
