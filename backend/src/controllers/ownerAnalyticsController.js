@@ -30,10 +30,13 @@ export async function getOwnerSalesAnalytics(req, res, next) {
     }
     const storeId = req.user.storeId
     const params = [storeId, range.start, range.end]
-    const grain = req.query.grain === 'month' ? 'month' : 'day'
+    const grain = ['day', 'month', 'week'].includes(req.query.grain) ? req.query.grain : 'day'
+    // Weekly reports use calendar weeks within the selected month: 1–7, 8–14, etc.
     const dateExpression = grain === 'month'
       ? `TO_CHAR(s.created_at AT TIME ZONE '${TZ}', 'YYYY-MM')`
-      : `TO_CHAR(s.created_at AT TIME ZONE '${TZ}', 'YYYY-MM-DD')`
+      : grain === 'week'
+        ? `TO_CHAR(s.created_at AT TIME ZONE '${TZ}', 'YYYY-MM') || '-W' || CEIL(EXTRACT(DAY FROM s.created_at AT TIME ZONE '${TZ}') / 7)::int::text`
+        : `TO_CHAR(s.created_at AT TIME ZONE '${TZ}', 'YYYY-MM-DD')`
 
     const [overview, products, employees, timeline, inventory] = await Promise.all([
       query(`
@@ -85,6 +88,19 @@ export async function getOwnerSalesAnalytics(req, res, next) {
         ORDER BY p.name ASC
       `, params)
     ])
+
+    // Count each sold product on its local calendar day. Keep cancelled receipts out.
+    const dailyProductsResult = await query(`
+      SELECT TO_CHAR(s.created_at AT TIME ZONE '${TZ}', 'YYYY-MM-DD') AS day,
+        si.product_id AS "productId", si.product_name_snapshot AS name,
+        SUM(si.quantity)::int AS quantity, COALESCE(SUM(si.subtotal),0) AS revenue
+      FROM sales s
+      JOIN sale_items si ON si.sale_id=s.id
+      WHERE s.store_id=$1 AND s.correction_status='ACTIVE'
+        AND s.created_at >= $2 AND s.created_at <= $3
+      GROUP BY day, si.product_id, si.product_name_snapshot
+      ORDER BY day DESC, quantity DESC, name ASC
+    `, params)
 
     const productRows = products.rows.map(row => ({
       productId: row.productId, name: row.name,
@@ -148,6 +164,10 @@ export async function getOwnerSalesAnalytics(req, res, next) {
         units: productRows.reduce((total, row) => total + row.quantity, 0)
       },
       topProducts: productRows,
+      dailyProducts: dailyProductsResult.rows.map(row => ({
+        day: row.day, productId: row.productId, name: row.name,
+        quantity: Number(row.quantity), revenue: Number(row.revenue)
+      })),
       employees: employeesWithUnits,
       timeline: timeline.rows.map(row => ({
         period: row.period, orders: Number(row.orders), revenue: Number(row.revenue)
