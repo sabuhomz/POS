@@ -13,11 +13,13 @@ const latest = computed(() => localDateTime(new Date()))
 const from = ref(localDateTime(new Date(now.getTime() - 30 * DAY)))
 const to = ref(localDateTime(now))
 const grain = ref('day')
+const weeklyMonth = ref(localDateTime(now).slice(0, 7))
+const dailySearch = ref('')
 const loading = ref(false)
 const errorMessage = ref('')
 const dashboard = ref({
   summary: { revenue: 0, subtotal: 0, discount: 0, orders: 0, units: 0 },
-  topProducts: [], employees: [], timeline: [], recommendations: [],
+  topProducts: [], dailyProducts: [], employees: [], timeline: [], recommendations: [],
   recommendationNote: ''
 })
 
@@ -27,6 +29,9 @@ const money = value => new Intl.NumberFormat('th-TH', {
 const count = value => new Intl.NumberFormat('th-TH').format(Number(value || 0))
 const summary = computed(() => dashboard.value.summary)
 const topProducts = computed(() => dashboard.value.topProducts)
+const dailyProducts = computed(() => dashboard.value.dailyProducts || [])
+const dailyFiltered = computed(() => dailyProducts.value.filter(item => String(item.name).toLocaleLowerCase('th').includes(dailySearch.value.trim().toLocaleLowerCase('th'))))
+const dailyTotal = computed(() => dailyFiltered.value.reduce((total, item) => total + Number(item.quantity || 0), 0))
 const employees = computed(() => dashboard.value.employees)
 const timeline = computed(() => dashboard.value.timeline)
 const recommendations = computed(() => dashboard.value.recommendations)
@@ -47,8 +52,21 @@ function preset(days) {
 
 async function loadDashboard() {
   errorMessage.value = ''
-  const start = new Date(from.value)
-  const end = new Date(to.value)
+  let start = new Date(from.value)
+  let end = new Date(to.value)
+  if (grain.value === 'week') {
+    if (!/^\d{4}-\d{2}$/.test(weeklyMonth.value)) {
+      errorMessage.value = 'กรุณาเลือกเดือนสำหรับรายงานรายสัปดาห์'
+      return
+    }
+    const [year, month] = weeklyMonth.value.split('-').map(Number)
+    start = new Date(year, month - 1, 1)
+    end = new Date(Math.min(new Date(year, month, 1).getTime() - 1000, Date.now()))
+    if (start > end) {
+      errorMessage.value = 'เดือนที่เลือกยังมาไม่ถึง'
+      return
+    }
+  }
   const current = Date.now()
   if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) ||
       start > end || start.getTime() < current - 365 * DAY - 60000 ||
@@ -71,6 +89,7 @@ async function loadDashboard() {
 
 const periodLabel = value => {
   if (!value) return ''
+  if (grain.value === 'week') return 'สัปดาห์ ' + value.split('-W')[1]
   const parts = value.split('-')
   return grain.value === 'month' ? `${parts[1]}/${parts[0]}` : `${parts[2]}/${parts[1]}`
 }
@@ -109,11 +128,16 @@ onMounted(loadDashboard)
           <select v-model="grain" class="field">
             <option value="day">รายวัน</option>
             <option value="month">รายเดือน</option>
+            <option value="week">รายสัปดาห์ (เลือกเดือน)</option>
           </select>
+        </label>
+        <label v-if="grain === 'week'" class="block">
+          <span class="mb-1 block text-sm font-semibold">เดือนที่ต้องการ</span>
+          <input v-model="weeklyMonth" type="month" :max="localDateTime(new Date()).slice(0, 7)" class="field" />
         </label>
         <button type="button" class="btn bg-teal-700 text-white" :disabled="loading" @click="loadDashboard">แสดงผล</button>
       </div>
-      <p class="mt-3 text-xs text-slate-500">ช่วงที่เลือก {{ rangeDays.toFixed(1) }} วัน </p>
+      <p class="mt-3 text-xs text-slate-500">{{ grain === 'week' ? 'รายสัปดาห์: แบ่งวันที่ 1–7, 8–14, 15–21, 22–28 และ 29–สิ้นเดือน' : `ช่วงที่เลือก ${rangeDays.toFixed(1)} วัน` }}</p>
     </section>
 
     <div v-if="errorMessage" role="alert" class="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">{{ errorMessage }}</div>
@@ -144,7 +168,7 @@ onMounted(loadDashboard)
     <section class="card">
       <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
         <h2>ยอดขายย้อนหลังตามช่วงเวลาที่เลือก</h2>
-        <span class="text-sm text-slate-500">{{ grain === 'month' ? 'รายเดือน' : 'รายวัน' }} · {{ timeline.length }} ช่วงที่มียอดขาย</span>
+        <span class="text-sm text-slate-500">{{ grain === 'month' ? 'รายเดือน' : grain === 'week' ? 'รายสัปดาห์ของเดือน ' + weeklyMonth : 'รายวัน' }} · {{ timeline.length }} ช่วงที่มียอดขาย</span>
       </div>
       <div v-if="!timeline.length" class="empty">ไม่มีรายการขายในช่วงเวลาที่เลือก</div>
       <div v-else class="overflow-x-auto">
@@ -158,6 +182,31 @@ onMounted(loadDashboard)
             <span class="bar-caption">{{ periodLabel(item.period) }}</span>
           </div>
         </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2>จำนวนสินค้าที่ขายได้ต่อวัน แยกตามรายการ</h2>
+          <p class="mt-1 text-sm text-slate-500">แสดงจำนวนชิ้นและยอดขายสุทธิจากใบเสร็จที่ไม่ถูกยกเลิก ตามช่วงเวลาที่เลือก</p>
+        </div>
+        <input v-model="dailySearch" type="search" class="field max-w-sm" placeholder="ค้นหาชื่อสินค้า..." aria-label="ค้นหาชื่อสินค้าในรายงานรายวัน" />
+      </div>
+      <div v-if="!dailyFiltered.length" class="empty">ไม่มีรายการขายรายวันที่ตรงกับเงื่อนไข</div>
+      <div v-else class="max-h-[550px] overflow-auto">
+        <table class="data-table">
+          <thead><tr><th>วันที่</th><th>รายการสินค้า</th><th class="text-right">จำนวนที่ขาย</th><th class="text-right">ยอดขายสุทธิ</th></tr></thead>
+          <tbody>
+            <tr v-for="item in dailyFiltered" :key="`${item.day}-${item.productId}-${item.name}`">
+              <td class="whitespace-nowrap">{{ item.day }}</td>
+              <td>{{ item.name }}</td>
+              <td class="text-right font-semibold">{{ count(item.quantity) }} ชิ้น</td>
+              <td class="text-right">{{ money(item.revenue) }}</td>
+            </tr>
+          </tbody>
+          <tfoot><tr><td colspan="2" class="p-3 font-bold">รวมรายการที่แสดง</td><td class="p-3 text-right font-bold">{{ count(dailyTotal) }} ชิ้น</td><td class="p-3 text-right font-bold">{{ money(dailyFiltered.reduce((total, row) => total + Number(row.revenue || 0), 0)) }}</td></tr></tfoot>
+        </table>
       </div>
     </section>
 
