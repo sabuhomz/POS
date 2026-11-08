@@ -33,7 +33,21 @@ const dailyProducts = computed(() => dashboard.value.dailyProducts || [])
 const dailyFiltered = computed(() => dailyProducts.value.filter(item => String(item.name).toLocaleLowerCase('th').includes(dailySearch.value.trim().toLocaleLowerCase('th'))))
 const dailyTotal = computed(() => dailyFiltered.value.reduce((total, item) => total + Number(item.quantity || 0), 0))
 const employees = computed(() => dashboard.value.employees)
-const timeline = computed(() => dashboard.value.timeline)
+const timeline = computed(() => {
+  const rows = dashboard.value.timeline || []
+  if (grain.value !== 'week') return rows
+  const [year, month] = weeklyMonth.value.split('-').map(Number)
+  if (!year || !month || month < 1 || month > 12) return rows
+  const lastDay = new Date(year, month, 0).getDate()
+  const current = new Date()
+  const currentMonth = year === current.getFullYear() && month === current.getMonth() + 1
+  const days = currentMonth ? Math.min(lastDay, current.getDate()) : lastDay
+  const byWeek = new Map(rows.map(row => [row.period, row]))
+  return Array.from({ length: Math.ceil(days / 7) }, (_, i) => {
+    const period = `${weeklyMonth.value}-W${i + 1}`
+    return byWeek.get(period) || { period, revenue: 0, orders: 0 }
+  })
+})
 const recommendations = computed(() => dashboard.value.recommendations)
 const toOrder = computed(() => recommendations.value.filter(row => row.decision === 'ควรสั่งเพิ่ม'))
 const toPause = computed(() => recommendations.value.filter(row => row.decision === 'ชะลอสั่ง'))
