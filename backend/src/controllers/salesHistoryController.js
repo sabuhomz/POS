@@ -132,3 +132,54 @@ export async function getSalesHistory(req, res, next) {
   }
 }
 
+
+/**
+ * Daily sales history for one product in the authenticated owner's store.
+ * Only active receipts contribute; sale_items snapshots keep historical prices.
+ */
+export async function getProductSalesHistory(req, res, next) {
+  try {
+    if (req.user.role !== 'OWNER' || !req.user.storeId) {
+      return res.status(403).json({ message: 'เฉพาะเจ้าของร้านเท่านั้น' })
+    }
+    const storeId = Number(req.user.storeId)
+    const productId = Number(req.query.productId)
+    if (!Number.isSafeInteger(productId) || productId <= 0) {
+      return res.status(400).json({ message: 'กรุณาเลือกสินค้า' })
+    }
+    const from = String(req.query.from || '').trim()
+    const to = String(req.query.to || '').trim()
+    if (!from || !to) return res.status(400).json({ message: 'กรุณาเลือกวันที่เริ่มต้นและสิ้นสุด' })
+    validateDateRange(from, to)
+    const product = await pool.query(
+      'SELECT id,name,sku FROM products WHERE id=$1 AND store_id=$2',
+      [productId, storeId]
+    )
+    if (!product.rowCount) return res.status(404).json({ message: 'ไม่พบสินค้านี้ในร้าน' })
+    const history = await pool.query(`
+      SELECT TO_CHAR(s.created_at AT TIME ZONE 'Asia/Bangkok', 'YYYY-MM-DD') AS day,
+        COALESCE(SUM(si.quantity), 0)::int AS quantity,
+        COALESCE(SUM(si.subtotal), 0) AS revenue,
+        COUNT(DISTINCT s.id)::int AS orders
+      FROM sale_items si
+      JOIN sales s ON s.id=si.sale_id
+      WHERE s.store_id=$1 AND si.product_id=$2 AND s.correction_status='ACTIVE'
+        AND (s.created_at AT TIME ZONE 'Asia/Bangkok')::date >= $3::date
+        AND (s.created_at AT TIME ZONE 'Asia/Bangkok')::date <= $4::date
+      GROUP BY day ORDER BY day ASC
+    `, [storeId, productId, from, to])
+    const rows = history.rows.map(row => ({
+      day: row.day, quantity: Number(row.quantity),
+      revenue: Number(row.revenue), orders: Number(row.orders)
+    }))
+    res.json({
+      product: product.rows[0],
+      from, to, rows,
+      summary: {
+        quantity: rows.reduce((sum, row) => sum + row.quantity, 0),
+        revenue: rows.reduce((sum, row) => sum + row.revenue, 0),
+        orders: rows.reduce((sum, row) => sum + row.orders, 0)
+      }
+    })
+  } catch (error) { next(error) }
+}
