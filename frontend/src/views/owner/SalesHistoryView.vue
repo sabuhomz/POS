@@ -69,6 +69,48 @@
       </div>
     </section>
 
+    <section class="rounded-xl border bg-white p-5 shadow">
+      <div class="mb-4">
+        <h2 class="text-lg font-bold">ประวัติยอดขายย้อนหลังของสินค้าที่เลือก</h2>
+        <p class="mt-1 text-sm text-gray-500">แสดงจำนวนขายและยอดขายสุทธิรายวันของสินค้ารายการเดียว โดยไม่นับบิลที่ยกเลิกแล้ว</p>
+      </div>
+      <form class="grid gap-3 md:grid-cols-4 md:items-end" @submit.prevent="loadProductHistory">
+        <label class="text-sm font-medium">เลือกสินค้า
+          <select v-model="selectedProductId" class="mt-1 block w-full rounded-lg border bg-white px-3 py-2" required>
+            <option value="">เลือกสินค้า...</option>
+            <option v-for="product in productCatalog" :key="product.id" :value="String(product.id)">{{ product.name }} ({{ product.sku }})</option>
+          </select>
+        </label>
+        <label class="text-sm font-medium">ตั้งแต่วันที่
+          <input v-model="productFrom" type="date" :max="productTo" class="mt-1 block w-full rounded-lg border px-3 py-2" required />
+        </label>
+        <label class="text-sm font-medium">ถึงวันที่
+          <input v-model="productTo" type="date" :min="productFrom" class="mt-1 block w-full rounded-lg border px-3 py-2" required />
+        </label>
+        <button type="submit" class="rounded-lg bg-teal-700 px-4 py-2 font-bold text-white disabled:opacity-50" :disabled="productLoading || !selectedProductId">{{ productLoading ? 'กำลังโหลด...' : 'ดูยอดขายสินค้า' }}</button>
+      </form>
+      <p v-if="productError" role="alert" class="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{{ productError }}</p>
+      <template v-if="productHistory">
+        <div class="my-4 grid gap-3 sm:grid-cols-3">
+          <div class="rounded-lg bg-gray-50 p-4">รวมขายได้ <strong class="block text-xl">{{ productHistory.summary.quantity }} ชิ้น</strong></div>
+          <div class="rounded-lg bg-gray-50 p-4">ยอดขายสุทธิ <strong class="block text-xl">{{ money(productHistory.summary.revenue) }}</strong></div>
+          <div class="rounded-lg bg-gray-50 p-4">จำนวนบิล <strong class="block text-xl">{{ productHistory.summary.orders }} บิล</strong></div>
+        </div>
+        <div v-if="!productHistory.rows.length" class="py-6 text-center text-gray-500">ไม่พบยอดขายสินค้านี้ในช่วงวันที่เลือก</div>
+        <div v-else class="max-h-[390px] overflow-auto rounded-lg border">
+          <table class="w-full min-w-[560px] text-left text-sm">
+            <thead class="sticky top-0 bg-gray-100"><tr><th class="p-3">วันที่</th><th class="p-3 text-right">จำนวนขาย</th><th class="p-3 text-right">จำนวนบิล</th><th class="p-3 text-right">ยอดขายสุทธิ</th></tr></thead>
+            <tbody>
+              <tr v-for="row in productHistory.rows" :key="row.day" class="border-t">
+                <td class="p-3">{{ row.day }}</td><td class="p-3 text-right">{{ row.quantity }} ชิ้น</td>
+                <td class="p-3 text-right">{{ row.orders }}</td><td class="p-3 text-right">{{ money(row.revenue) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </template>
+    </section>
+
     <div class="rounded-xl bg-white p-6 shadow">
       <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         <div>
@@ -183,12 +225,19 @@ const selectedSale = ref(null)
 const filters = reactive({ search: '', paymentMethod: '', from: '', to: '' })
 const pagination = reactive({ page: 1, limit: 20, total: 0, totalPages: 0 })
 const shiftRows = ref([])
+const productCatalog = ref([])
+const selectedProductId = ref('')
+const productHistory = ref(null)
+const productLoading = ref(false)
+const productError = ref('')
 const shiftLoading = ref(false)
 const shiftError = ref('')
 const today = new Date()
 const localToday = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
 const shiftFrom = ref(localToday)
 const shiftTo = ref(localToday)
+const productTo = ref(localToday)
+const productFrom = ref((() => { const d = new Date(); d.setDate(d.getDate() - 30); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` })())
 const shiftOrderCount = computed(() => shiftRows.value.reduce((sum, shift) => sum + Number(shift.orderCount || 0), 0))
 const shiftSalesTotal = computed(() => shiftRows.value.reduce((sum, shift) => sum + Number(shift.totalSales || 0), 0))
 
@@ -244,6 +293,32 @@ async function loadShifts() {
   }
 }
 
+async function loadProductCatalog() {
+  try {
+    const { data } = await api.get('/products')
+    productCatalog.value = Array.isArray(data) ? data : (data.products || [])
+  } catch (error) {
+    productError.value = error.response?.data?.message || 'โหลดรายการสินค้าไม่สำเร็จ'
+  }
+}
+
+async function loadProductHistory() {
+  if (!selectedProductId.value) return
+  productLoading.value = true
+  productError.value = ''
+  productHistory.value = null
+  try {
+    const { data } = await api.get('/owner/product-sales-history', {
+      params: { productId: selectedProductId.value, from: productFrom.value, to: productTo.value }
+    })
+    productHistory.value = data
+  } catch (error) {
+    productError.value = error.response?.data?.message || 'โหลดประวัติยอดขายสินค้าไม่สำเร็จ'
+  } finally {
+    productLoading.value = false
+  }
+}
+
 function applyFilters() {
   pagination.page = 1
   loadSales()
@@ -263,5 +338,6 @@ function changePage(page) {
 onMounted(() => {
   loadSales()
   loadShifts()
+  loadProductCatalog()
 })
 </script>
