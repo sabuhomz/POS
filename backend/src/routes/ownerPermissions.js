@@ -75,8 +75,6 @@ router.put('/permissions/employees/:id', async (req, res, next) => {
       ('sale.correction.request','Request receipt corrections'),
       ('sale.correction.direct','Direct receipt corrections')
       ON CONFLICT (permission_key) DO NOTHING`)
-      ('sale.correction.request','Request receipt correction'),
-      ('sale.correction.direct','Direct receipt correction')
     const catalog = await client.query(
       'SELECT permission_key FROM permissions WHERE permission_key = ANY($1::varchar[])',
       [permissions]
