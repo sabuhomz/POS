@@ -88,6 +88,27 @@ await test('full API flow, invalid inputs, store isolation, and database failure
     await request('PUT', `/employees/${employeeId}`, { first_name: 'Updated' }, owner)
     await request('PATCH', `/employees/${employeeId}/status`, { is_active: 'false' }, owner, 400)
   })
+  await t.test('owner can save and reload employee permissions', async () => {
+    const catalog = await request('GET', '/owner/permissions/catalog', undefined, owner)
+    assert.ok(catalog.permissions.includes('sale.correction.request'))
+    const selected = [
+      'sale.create', 'inventory.restock.request', 'sale.view',
+      'sale.correction.request'
+    ]
+    const saved = await request('PUT', `/owner/permissions/employees/${employeeId}`, {
+      permissions: selected
+    }, owner)
+    assert.deepEqual(saved.permissions, selected)
+    const employees = await request('GET', '/owner/permissions/employees', undefined, owner)
+    const staff = employees.employees.find(entry => Number(entry.id) === Number(employeeId))
+    assert.ok(staff)
+    for (const permission of [...selected, 'product.view']) {
+      assert.ok(staff.permissions.includes(permission), `Missing ${permission}`)
+    }
+    await request('PUT', `/owner/permissions/employees/${employeeId}`, {
+      permissions: ['sale.correction.direct']
+    }, employee, 403)
+  })
   await t.test('stock, promotions including blank optional rules, and reports', async () => {
     await request('POST', '/restock/owner/add', { product_id: product.id, barcodes: ['BC-001', 'BC-002'] }, owner, 201)
     await request('POST', '/restock/owner/add', { product_id: product.id, barcodes: ['BC-001'] }, owner, 409)
